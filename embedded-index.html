@@ -54,24 +54,24 @@
     </div>
 
     <div class="panel">
+      <h2>名刺用キーワードのモード（先に選ぶ）</h2>
+      <p class="muted"><strong>永久化</strong>…その名刺URLが<strong>初めて</strong>読まれたときのキーワードがサーバーに保存され、<strong>モードを変えてもキーワードを変えても、もうそのURLの単語は変わりません</strong>。</p>
+      <p class="muted"><strong>リサイクル</strong>…<strong>まだ永久化で一度も読まれていない</strong>名刺URLだけ、保存したキーワードの変更に<strong>毎回追従</strong>します。一度永久化で表示・固定されたURLは追従しません。</p>
+      <div class="toolbar">
+        <button type="button" class="btn-secondary" id="btnModeRecycle">リサイクル</button>
+        <button type="button" class="btn-secondary" id="btnModeFrozen">永久化</button>
+      </div>
+      <p id="modeLine" class="muted" style="margin-top:0.5rem"></p>
+    </div>
+
+    <div class="panel">
       <h2>キーワード</h2>
-      <p class="muted">名刺用QRで使う単語です。<strong>設定を保存</strong>した内容が参照されます（モードにより「初回だけ固定」か「その都度追従」かが変わります）。</p>
+      <p class="muted">上で選んだモードに従い、名刺用QRで使う単語です。<strong>設定を保存</strong>するとサーバーに反映されます。</p>
       <input type="text" id="keyword" placeholder="例: りんご" autocomplete="off" />
       <div class="toolbar">
         <button type="button" class="btn-secondary" id="btnPreviewKeyword">プレビュー</button>
         <button type="button" class="btn-primary" id="saveBtn">設定を保存</button>
       </div>
-    </div>
-
-    <div class="panel">
-      <h2>名刺用キーワードのモード</h2>
-      <p class="muted"><strong>永久化</strong>…その名刺URLが<strong>初めて</strong>読まれたときのキーワードがサーバーに保存され、<strong>モードを変えてもキーワードを変えても、もうそのURLの単語は変わりません</strong>。</p>
-      <p class="muted"><strong>リサイクル</strong>…<strong>まだ永久化で一度も読まれていない</strong>名刺URLだけ、保存したキーワードの変更に<strong>毎回追従</strong>します。一度永久化で表示・固定されたURLは追従しません。</p>
-      <div class="toolbar">
-        <button type="button" class="btn-secondary" id="btnModeFrozen">永久化</button>
-        <button type="button" class="btn-secondary" id="btnModeRecycle">リサイクル</button>
-      </div>
-      <p id="modeLine" class="muted" style="margin-top:0.5rem"></p>
     </div>
 
     <div class="panel">
@@ -160,8 +160,8 @@
 
     function renderTicketModeUi() {
       const m = ticketKeywordMode();
-      document.getElementById("btnModeFrozen").className = m === "frozen" ? "btn-primary" : "btn-secondary";
       document.getElementById("btnModeRecycle").className = m === "recycle" ? "btn-primary" : "btn-secondary";
+      document.getElementById("btnModeFrozen").className = m === "frozen" ? "btn-danger" : "btn-secondary";
       document.getElementById("modeLine").textContent =
         m === "frozen"
           ? "いまのモード: 永久化（初回でそのURLの単語が永久に固定）"
