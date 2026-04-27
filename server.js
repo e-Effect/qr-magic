@@ -55,10 +55,6 @@ function defaultState() {
   const google = "https://www.google.com/search?q={query}";
   return {
     queries: [""],
-    /** legacy fields ignored by current app; kept in JSON for older state files */
-    counter: 0,
-    performanceActive: false,
-    permanent: false,
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
     templatePresets: [{ label: "Google", template: google }],
     activeTemplateIndex: 0,
@@ -135,8 +131,17 @@ function readState() {
   }
 }
 
+/** 旧「パフォーマンス／永続化」用フィールド。もう使わないので保存時に落とす */
+function stripLegacyPerformanceFlags(s) {
+  if (!s || typeof s !== "object") return;
+  delete s.counter;
+  delete s.performanceActive;
+  delete s.permanent;
+}
+
 function writeState(state) {
   ensureDataDir();
+  stripLegacyPerformanceFlags(state);
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
 }
 
