@@ -112,10 +112,8 @@
 
   <div id="app" style="display:none">
     <div class="panel">
-      <h2>リダイレクトURLのテンプレート</h2>
-      <p class="muted">プリセットは<strong>サーバー側で定義</strong>されています。ここでは使うものだけを選びます（<code>{query}</code> / 任意で <code>{host}</code>）。</p>
-      <label class="muted" for="templateSelect">いま使うもの</label>
-      <select id="templateSelect" style="margin-top:0.35rem;margin-bottom:0.75rem"></select>
+      <h2>テンプレート</h2>
+      <select id="templateSelect" aria-label="テンプレート" style="margin-top:0.35rem;margin-bottom:0.75rem"></select>
       <p class="muted" style="font-size:.8rem;margin:0 0 .35rem">切り替えはすぐサーバーに反映されます（キーワード欄の内容も一緒に保存されます）。</p>
     </div>
 
@@ -138,11 +136,6 @@
         <button type="button" class="btn-primary" id="saveBtn">設定を保存</button>
         <button type="button" class="btn-secondary" id="btnPreviewKeyword">プレビュー</button>
       </div>
-    </div>
-
-    <div class="panel">
-      <h2>現在の状態</h2>
-      <p id="statusLine" class="muted"></p>
     </div>
 
     <div class="panel">
@@ -304,17 +297,6 @@
 
     function renderAll() {
       ensurePresets();
-      const curLabel =
-        (state.templatePresets[state.activeTemplateIndex] || state.templatePresets[0] || {}).label || "";
-      document.getElementById("statusLine").textContent =
-        "キーワード: " +
-        ((state.queries && state.queries[0]) || "（空）") +
-        " / テンプレ: " +
-        curLabel +
-        " / モード: " +
-        (ticketKeywordMode() === "recycle" ? "リサイクル" : "永久化") +
-        " / 名刺用URL数: " +
-        (state.ticketCount != null ? state.ticketCount : 0);
       document.getElementById("ticketStatus").textContent =
         "登録中の名刺用URL: " + (state.ticketCount != null ? state.ticketCount : 0) + " 本";
       renderTemplateBlock();
