@@ -52,14 +52,18 @@ function ensureDataDir() {
 }
 
 function defaultState() {
+  const google = "https://www.google.com/search?q={query}";
   return {
     queries: [""],
     /** legacy fields ignored by current app; kept in JSON for older state files */
     counter: 0,
     performanceActive: false,
     permanent: false,
-    /** Placeholders: {query} required. Optional {host} */
-    serviceTemplate: "https://www.google.com/search?q={query}",
+    /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
+    templatePresets: [{ label: "Google", template: google }],
+    activeTemplateIndex: 0,
+    /** 互換・内部同期用（= templatePresets[activeTemplateIndex].template） */
+    serviceTemplate: google,
     /**
      * 名刺用: トークン → { query, template }
      * query が null/空のときは「未割当」→ 初回GETでその時点のキーワード（queries の先頭の非空）を保存して固定
@@ -67,6 +71,39 @@ function defaultState() {
      */
     tickets: {},
   };
+}
+
+const MAX_TEMPLATE_PRESETS = 20;
+
+function syncTemplatesFromPresets(state) {
+  const presets = Array.isArray(state.templatePresets) ? state.templatePresets : [];
+  const cleaned = [];
+  for (const p of presets) {
+    const label = String((p && p.label) || "").trim().slice(0, 60) || `プリセット ${cleaned.length + 1}`;
+    const tmpl = String((p && p.template) || "").trim();
+    if (!tmpl.includes("{query}")) continue;
+    cleaned.push({ label, template: tmpl });
+  }
+  if (cleaned.length === 0) {
+    const fb = defaultState().serviceTemplate;
+    cleaned.push({ label: "Google", template: fb });
+  }
+  let idx = parseInt(state.activeTemplateIndex, 10);
+  if (!Number.isFinite(idx) || idx < 0 || idx >= cleaned.length) idx = 0;
+  state.templatePresets = cleaned;
+  state.activeTemplateIndex = idx;
+  state.serviceTemplate = cleaned[idx].template;
+}
+
+function migrateTemplatePresets(merged) {
+  const base = defaultState();
+  const legacy = String(merged.serviceTemplate || "").trim();
+  if (!Array.isArray(merged.templatePresets) || merged.templatePresets.length === 0) {
+    merged.templatePresets = legacy.includes("{query}")
+      ? [{ label: "既定", template: legacy }]
+      : [{ ...base.templatePresets[0] }];
+  }
+  syncTemplatesFromPresets(merged);
 }
 
 /** キーワードは1語だけ。旧データの複数行は先頭の非空1つに畳む */
@@ -91,6 +128,7 @@ function readState() {
     const parsed = JSON.parse(raw);
     const merged = { ...defaultState(), ...parsed };
     merged.queries = normalizeQueriesToSingle(merged.queries);
+    migrateTemplatePresets(merged);
     return merged;
   } catch {
     return defaultState();
@@ -199,6 +237,8 @@ app.get("/api/state", adminAuth, (req, res) => {
     state: {
       queries: state.queries,
       serviceTemplate: state.serviceTemplate,
+      templatePresets: state.templatePresets,
+      activeTemplateIndex: state.activeTemplateIndex,
       ticketCount: Object.keys(state.tickets || {}).length,
     },
   });
@@ -207,15 +247,45 @@ app.get("/api/state", adminAuth, (req, res) => {
 app.put("/api/state", adminAuth, (req, res) => {
   const cur = readState();
   const body = req.body || {};
-  let serviceTemplate = cur.serviceTemplate;
-  if (typeof body.serviceTemplate === "string" && body.serviceTemplate.includes("{query}")) {
-    serviceTemplate = body.serviceTemplate;
-  }
   const next = {
     ...cur,
-    queries: normalizeQueriesToSingle(Array.isArray(body.queries) ? body.queries.map((q) => String(q)) : cur.queries),
-    serviceTemplate,
+    queries: normalizeQueriesToSingle(
+      Array.isArray(body.queries) ? body.queries.map((q) => String(q)) : cur.queries
+    ),
   };
+
+  if (Array.isArray(body.templatePresets)) {
+    next.templatePresets = body.templatePresets.slice(0, MAX_TEMPLATE_PRESETS).map((p) => ({
+      label: String((p && p.label) || "").trim().slice(0, 60),
+      template: String((p && p.template) || "").trim(),
+    }));
+    const idx = parseInt(body.activeTemplateIndex, 10);
+    if (Number.isFinite(idx) && idx >= 0 && idx < next.templatePresets.length) {
+      next.activeTemplateIndex = idx;
+    } else {
+      next.activeTemplateIndex = 0;
+    }
+    syncTemplatesFromPresets(next);
+  } else if (body.activeTemplateIndex !== undefined && body.activeTemplateIndex !== null) {
+    const idx = parseInt(body.activeTemplateIndex, 10);
+    if (Number.isFinite(idx) && Array.isArray(next.templatePresets) && idx >= 0 && idx < next.templatePresets.length) {
+      next.activeTemplateIndex = idx;
+    }
+    syncTemplatesFromPresets(next);
+  } else if (typeof body.serviceTemplate === "string" && body.serviceTemplate.includes("{query}")) {
+    next.serviceTemplate = body.serviceTemplate;
+    const i = Number.isFinite(parseInt(cur.activeTemplateIndex, 10)) ? parseInt(cur.activeTemplateIndex, 10) : 0;
+    if (Array.isArray(next.templatePresets) && next.templatePresets[i]) {
+      next.templatePresets[i] = { ...next.templatePresets[i], template: body.serviceTemplate };
+    } else {
+      next.templatePresets = [{ label: "既定", template: body.serviceTemplate }];
+      next.activeTemplateIndex = 0;
+    }
+    syncTemplatesFromPresets(next);
+  } else {
+    syncTemplatesFromPresets(next);
+  }
+
   writeState(next);
   res.json({
     ok: true,
