@@ -208,13 +208,37 @@ app.post("/api/reset-counter", adminAuth, (req, res) => {
   res.json({ ok: true, state: cur });
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+const PUBLIC_DIR = path.join(__dirname, "public");
+
+/** 管理画面HTML: public が無くても embedded-index.js で動く（Render 対策） */
+function loadAdminIndexHtml() {
+  try {
+    return fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
+  } catch (_) {}
+  try {
+    return require("./embedded-index.js");
+  } catch (_) {}
+  return null;
+}
+
+app.get("/", (_req, res) => {
+  const html = loadAdminIndexHtml();
+  if (html) {
+    return res.type("html").send(html);
+  }
+  return res.status(200).type("html").send(`<!DOCTYPE html><html lang="ja"><meta charset="utf-8">
+<title>エラー</title><body style="font-family:sans-serif;padding:1.5rem">
+<p>管理画面を読み込めません。<code>embedded-index.js</code> がリポジトリに含まれているか確認してください。</p>
+</body></html>`);
+});
+
+app.use(express.static(PUBLIC_DIR));
 
 app.use((req, res) => {
   if (req.path.startsWith("/api/")) {
     return res.status(404).json({ ok: false });
   }
-  res.status(404).send("Not found");
+  res.status(404).type("text/plain").send("not-found-qr-magic-v7");
 });
 
 app.listen(PORT, () => {
