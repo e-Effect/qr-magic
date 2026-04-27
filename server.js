@@ -158,6 +158,7 @@ function readState() {
     const parsed = JSON.parse(raw);
     const merged = { ...defaultState(), ...parsed };
     merged.queries = normalizeQueriesToSingle(merged.queries);
+    normalizeTicketsOnRead(merged);
     migrateTemplatePresets(merged);
     normalizeTicketKeywordMode(merged);
     return merged;
@@ -211,6 +212,65 @@ function ticketQueryBound(t) {
   return String(t.query).trim().length > 0;
 }
 
+/** state.json の tickets を常に { token: { query, template } } 形にそろえる（旧形式・null 対策） */
+function normalizeTicketsOnRead(merged) {
+  const raw = merged.tickets;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    merged.tickets = {};
+    return;
+  }
+  const out = {};
+  for (const k of Object.keys(raw)) {
+    const key = String(k).trim();
+    if (!key || key === PUBLIC_TOKEN) continue;
+    const v = raw[k];
+    if (v == null) continue;
+    if (typeof v === "string") {
+      const q = v.trim();
+      out[key] = { query: q.length ? q : null, template: null };
+      continue;
+    }
+    if (typeof v === "object") {
+      out[key] = {
+        query: v.query == null || String(v.query).trim() === "" ? null : v.query,
+        template: v.template == null ? null : v.template,
+      };
+    }
+  }
+  merged.tickets = out;
+}
+
+/** QR のパスと state のトークンを突き合わせ（エンコード・大文字小文字の差を吸収） */
+function findTicketEntry(state, rawToken) {
+  const tickets =
+    state.tickets && typeof state.tickets === "object" && !Array.isArray(state.tickets) ? state.tickets : {};
+  const t0 = String(rawToken || "").trim();
+  if (!t0) return null;
+  function pick(key) {
+    if (!Object.prototype.hasOwnProperty.call(tickets, key)) return null;
+    const ticket = tickets[key];
+    if (!ticket || typeof ticket !== "object") return null;
+    return { key, ticket };
+  }
+  const a = pick(t0);
+  if (a) return a;
+  try {
+    const d = decodeURIComponent(t0);
+    if (d !== t0) {
+      const b = pick(d);
+      if (b) return b;
+    }
+  } catch (_) {}
+  const low = t0.toLowerCase();
+  for (const k of Object.keys(tickets)) {
+    if (k.toLowerCase() === low) {
+      const c = pick(k);
+      if (c) return c;
+    }
+  }
+  return null;
+}
+
 const app = express();
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "512kb" }));
@@ -227,17 +287,15 @@ app.get("/api/public-qr-hint", (req, res) => {
 
 /** Spectator scan */
 app.get("/r/:token", (req, res) => {
-  const token = req.params.token;
   const state = readState();
-  const tickets = state.tickets && typeof state.tickets === "object" ? state.tickets : {};
-
+  const found = findTicketEntry(state, req.params.token);
   /**
    * 名刺用:
    * - 一度でも query が入った URL（永久化で初回表示されたもの）は、モード変更後も常にその単語のまま
    * - query がまだ無い URL だけ: recycle なら毎回いまのキーワード / frozen なら初回で query を保存して固定
    */
-  if (tickets[token]) {
-    const t = tickets[token];
+  if (found) {
+    const { key: ticketKey, ticket: t } = found;
     const recycle = state.ticketKeywordMode === "recycle";
     const tmpl =
       t.template && String(t.template).includes("{query}")
@@ -278,12 +336,13 @@ app.get("/r/:token", (req, res) => {
 <p style="color:#555;font-size:.9rem">永久化では、この初回で単語がこの名刺URLに固定され、あとから変わりません。</p>
 </body></html>`);
     }
-    t.query = live;
+    state.tickets[ticketKey].query = live;
     writeState(state);
     const url = buildUrl(tmpl, live, req);
     return res.redirect(302, url);
   }
 
+  const token = String(req.params.token || "").trim();
   if (token === PUBLIC_TOKEN) {
     return res.status(404).type("html").send(`<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
