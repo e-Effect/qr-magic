@@ -33,6 +33,16 @@ const PUBLIC_TOKEN = process.env.PUBLIC_TOKEN || "dev-public-change-me";
 const DATA_DIR = path.join(__dirname, "data");
 const STATE_FILE = path.join(DATA_DIR, "state.json");
 const TUNNEL_URL_FILE = path.join(DATA_DIR, "tunnel-url.txt");
+const PACKAGE_JSON = path.join(__dirname, "package.json");
+
+/** 管理画面表示用。仕様やUIを変えたら package.json の version を上げる */
+function getAppVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(PACKAGE_JSON, "utf8")).version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
 /** 観客用の https オリジン（末尾スラッシュなし）。.env の PUBLIC_BASE_URL 優先、なければ tunnel-only が書いたファイル */
 function getPublicBaseUrl() {
@@ -186,6 +196,10 @@ function ticketQueryBound(t) {
 const app = express();
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "512kb" }));
+
+app.get("/api/version", (_req, res) => {
+  res.json({ ok: true, version: getAppVersion() });
+});
 
 /** トンネル等で観客用オリジンが決まったら管理画面がポーリングする（URL表示は廃止済み） */
 app.get("/api/public-qr-hint", (req, res) => {

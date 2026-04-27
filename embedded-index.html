@@ -26,6 +26,7 @@
   </style>
 </head>
 <body>
+  <p id="appVersionBar" class="muted" style="font-size:0.82rem;margin:0 0 0.5rem">バージョン …</p>
   <h1>QR Magic（個人用）</h1>
   <p class="muted">アカウントはありません。<code>ADMIN_TOKEN</code> を知っている人だけが設定できます。</p>
 
@@ -433,6 +434,19 @@
     }
 
     if (adminToken) startApp();
+
+    (function loadAppVersion() {
+      fetch("/api/version")
+        .then((r) => r.json())
+        .then((d) => {
+          const el = document.getElementById("appVersionBar");
+          if (el && d.version) el.textContent = "バージョン " + d.version;
+        })
+        .catch(() => {
+          const el = document.getElementById("appVersionBar");
+          if (el) el.textContent = "";
+        });
+    })();
   </script>
 </body>
 </html>
