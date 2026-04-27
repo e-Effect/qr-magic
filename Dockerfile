@@ -1,3 +1,4 @@
+# v2026-04-27 — Render の Docker キャッシュ対策で行を変えると再ビルドされやすい
 FROM node:22-alpine
 WORKDIR /app
 COPY package.json package-lock.json* ./
