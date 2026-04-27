@@ -61,9 +61,12 @@ function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+/** Google Maps 公式の検索用 URL（api=1 と query が必要） */
+const MAPS_SEARCH_TEMPLATE = "https://www.google.com/maps/search/?api=1&query={query}";
+
 function defaultState() {
   const google = "https://www.google.com/search?q={query}";
-  const maps = "https://www.google.com/maps/search?q={query}";
+  const maps = MAPS_SEARCH_TEMPLATE;
   return {
     queries: [""],
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
@@ -115,12 +118,16 @@ function migrateTemplatePresets(merged) {
       ? [{ label: "既定", template: legacy }]
       : [{ ...base.templatePresets[0] }];
   }
-  const mapsT = "https://www.google.com/maps/search?q={query}";
-  const hasMaps = (merged.templatePresets || []).some((p) =>
-    String(p.template || "").includes("google.com/maps")
-  );
+  merged.templatePresets = (merged.templatePresets || []).map((p) => {
+    const t = String((p && p.template) || "");
+    if (t === "https://www.google.com/maps/search?q={query}") {
+      return { ...p, template: MAPS_SEARCH_TEMPLATE };
+    }
+    return { ...p };
+  });
+  const hasMaps = merged.templatePresets.some((p) => String(p.template || "").includes("google.com/maps"));
   if (!hasMaps && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
-    merged.templatePresets.push({ label: "Google マップ", template: mapsT });
+    merged.templatePresets.push({ label: "Google マップ", template: MAPS_SEARCH_TEMPLATE });
   }
   syncTemplatesFromPresets(merged);
 }
