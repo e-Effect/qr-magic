@@ -63,10 +63,14 @@ function ensureDataDir() {
 
 function defaultState() {
   const google = "https://www.google.com/search?q={query}";
+  const maps = "https://www.google.com/maps/search?q={query}";
   return {
     queries: [""],
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
-    templatePresets: [{ label: "Google", template: google }],
+    templatePresets: [
+      { label: "Google", template: google },
+      { label: "Google マップ", template: maps },
+    ],
     activeTemplateIndex: 0,
     /** 互換・内部同期用（= templatePresets[activeTemplateIndex].template） */
     serviceTemplate: google,
@@ -110,6 +114,13 @@ function migrateTemplatePresets(merged) {
     merged.templatePresets = legacy.includes("{query}")
       ? [{ label: "既定", template: legacy }]
       : [{ ...base.templatePresets[0] }];
+  }
+  const mapsT = "https://www.google.com/maps/search?q={query}";
+  const hasMaps = (merged.templatePresets || []).some((p) =>
+    String(p.template || "").includes("google.com/maps")
+  );
+  if (!hasMaps && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
+    merged.templatePresets.push({ label: "Google マップ", template: mapsT });
   }
   syncTemplatesFromPresets(merged);
 }
