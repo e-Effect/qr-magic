@@ -1,0 +1,57 @@
+================================================================================
+  Render への反映を「楽」にする
+================================================================================
+
+【いちばん楽 — PowerShell でこれだけ（他アプリと同じ感覚）】
+
+  初回だけ:
+    1) Render → サービス → Settings → Deploy Hook の URL をコピー
+    2) qr-magic の .env に1行追加:
+
+        RENDER_DEPLOY_HOOK=https://api.render.com/deploy/srv-xxxx?key=yyyy
+
+    3) このフォルダを GitHub とつないでおく（origin があること）
+
+  2回目から — 次のどちらかをコピペして Enter だけ:
+
+    （A）フォルダに入ってから実行
+
+        cd C:\Users\user\Desktop\qr-magic
+        powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy.ps1
+
+    （B）フルパス1行（どこからでも）
+
+        powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\user\Desktop\qr-magic\deploy.ps1"
+
+  deploy.ps1 は「未コミットなら add+commit → push → Render フック」をまとめてやります。
+  Git を使わない場合は:
+
+        powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\user\Desktop\qr-magic\deploy.ps1" -SkipGit
+
+  （その場合は GitHub 側を自分で更新してから、フックだけ飛ばす）
+
+--------------------------------------------------------------------------------
+
+【代替 — npm だけ】
+
+        cd C:\Users\user\Desktop\qr-magic
+        npm.cmd run deploy
+
+  GitHub へは別途 push 済みである必要があります。
+
+--------------------------------------------------------------------------------
+
+【補足】
+
+  Render が GitHub と連携済みなら、**git push だけ**でも自動ビルドが走ることがあります。
+  deploy.ps1 は「push したあと確実にビルドを走らせる」ためにフックも叩きます。
+
+--------------------------------------------------------------------------------
+
+  キャッシュが怪しいとき
+
+  Render の画面から「Clear build cache & deploy」は今まで通り使えます。
+  Deploy Hook だけではキャッシュ消しが弱いことがあるので、そのときは
+  ブラウザで一度だけ手動でもよいです。
+
+================================================================================

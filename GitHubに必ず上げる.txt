@@ -1,0 +1,27 @@
+================================================================================
+  Render に載せるとき、GitHub に「必ず」含めてほしいファイル
+================================================================================
+
+  トップページが真っ白／404 になるのを防ぐため、次の2つはセットで必須です。
+
+    server.js           … 本体（最新版）
+    embedded-index.js   … 管理画面HTMLのコピー（public が無くても動く）
+
+  あわせて通常は次も一緒に:
+
+    package.json
+    package-lock.json
+    Dockerfile          … Docker で載せる場合
+    tunnel-only.js
+    public/ フォルダ    … あってもよい（無くても embedded で動く）
+
+  上げない:
+    node_modules/
+    .env
+
+  更新したら Render で「Manual Deploy → Clear build cache & deploy」。
+
+  404 の本文が「not-found-qr-magic-v7」なら、新しい server.js が載っています。
+  まだ「Not found」だけなら、GitHub に server.js が反映されていません。
+
+================================================================================
