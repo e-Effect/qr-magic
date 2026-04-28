@@ -246,8 +246,15 @@
       try {
         const d = await api("/api/tickets");
         const base = audienceOrigin();
-        const n = d.ticketCount != null ? d.ticketCount : 0;
-        meta.textContent = "登録 " + n + " 本 · 観客向けベース " + base;
+        const total = d.ticketCount != null ? d.ticketCount : 0;
+        const listed = d.listCount != null ? d.listCount : (d.paths || []).length;
+        meta.textContent =
+          "全登録 " +
+          total +
+          " 本 · 一覧は未固定 " +
+          listed +
+          " 本（永久化済みは非表示）· 観客向けベース " +
+          base;
         const paths = d.paths || [];
         ta.value = paths.map((p) => base + p).join("\n");
       } catch (e) {

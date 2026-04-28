@@ -598,7 +598,9 @@ app.get("/api/tickets", adminAuth, async (req, res) => {
   }
   const tickets =
     state.tickets && typeof state.tickets === "object" && !Array.isArray(state.tickets) ? state.tickets : {};
-  const keys = Object.keys(tickets).sort();
+  const keysAll = Object.keys(tickets).sort();
+  /** 永久化でキーワード固定済みの名刺は「未印刷用一覧」から除外 */
+  const keys = keysAll.filter((tok) => !ticketQueryBound(ensureTicketStats(tickets[tok] || {})));
   const paths = keys.map((tok) => `/r/${tok}`);
   const rows = keys.map((tok) => {
     const t = ensureTicketStats(tickets[tok] || {});
@@ -612,7 +614,13 @@ app.get("/api/tickets", adminAuth, async (req, res) => {
       query: t.query == null ? null : String(t.query),
     };
   });
-  res.json({ ok: true, ticketCount: paths.length, paths, tickets: rows });
+  res.json({
+    ok: true,
+    ticketCount: keysAll.length,
+    listCount: paths.length,
+    paths,
+    tickets: rows,
+  });
 });
 
 /** 設定ドロワー向け: 簡易アクセス履歴（合計・各URL・直近イベント） */
