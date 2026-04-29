@@ -93,12 +93,22 @@ function defaultState() {
   const google = "https://www.google.com/search?q={query}";
   const maps = MAPS_SEARCH_TEMPLATE;
   const ytTop = "{host}/yt-top?q={query}";
+  const wikiJa = "https://ja.wikipedia.org/wiki/Special:Search?search={query}";
+  const amazonJp = "https://www.amazon.co.jp/s?k={query}";
+  const spotify = "https://open.spotify.com/search/{query}";
+  const appleMusic = "https://music.apple.com/jp/search?term={query}";
+  const lineText = "https://line.me/R/msg/text/?{query}";
   return {
     queries: [""],
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
     templatePresets: [
       { label: "Google", template: google },
       { label: "Google マップ", template: maps },
+      { label: "Wikipedia（日本語）", template: wikiJa },
+      { label: "Amazon 商品検索", template: amazonJp },
+      { label: "Spotify 検索", template: spotify },
+      { label: "Apple Music 検索", template: appleMusic },
+      { label: "LINE で送る", template: lineText },
       { label: "YouTube 即再生(近似)", template: ytTop },
     ],
     activeTemplateIndex: 0,
@@ -168,6 +178,19 @@ function migrateTemplatePresets(merged) {
   const hasYouTubeTop = merged.templatePresets.some((p) => String(p.template || "").includes("/yt-top?q={query}"));
   if (!hasYouTubeTop && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
     merged.templatePresets.push({ label: "YouTube 即再生(近似)", template: "{host}/yt-top?q={query}" });
+  }
+  const extraPresets = [
+    { label: "Wikipedia（日本語）", template: "https://ja.wikipedia.org/wiki/Special:Search?search={query}" },
+    { label: "Amazon 商品検索", template: "https://www.amazon.co.jp/s?k={query}" },
+    { label: "Spotify 検索", template: "https://open.spotify.com/search/{query}" },
+    { label: "Apple Music 検索", template: "https://music.apple.com/jp/search?term={query}" },
+    { label: "LINE で送る", template: "https://line.me/R/msg/text/?{query}" },
+  ];
+  for (const extra of extraPresets) {
+    const exists = merged.templatePresets.some((p) => String((p && p.template) || "").trim() === extra.template);
+    if (!exists && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
+      merged.templatePresets.push({ label: extra.label, template: extra.template });
+    }
   }
   syncTemplatesFromPresets(merged);
 }
