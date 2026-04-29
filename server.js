@@ -57,6 +57,8 @@ const YOUTUBE_API_KEY = (process.env.YOUTUBE_API_KEY || "").trim();
 
 const DATA_DIR = path.join(__dirname, "data");
 const STATE_FILE = path.join(DATA_DIR, "state.json");
+const STATE_BACKUP_DIR = path.join(DATA_DIR, "state-backups");
+const MAX_STATE_BACKUPS = 20;
 const TUNNEL_URL_FILE = path.join(DATA_DIR, "tunnel-url.txt");
 const PACKAGE_JSON = path.join(__dirname, "package.json");
 
@@ -366,7 +368,27 @@ function stripLegacyPerformanceFlags(s) {
 function writeStateToFileSync(state) {
   ensureDataDir();
   stripLegacyPerformanceFlags(state);
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf8");
+  const json = JSON.stringify(state, null, 2);
+  fs.writeFileSync(STATE_FILE, json, "utf8");
+  try {
+    if (!fs.existsSync(STATE_BACKUP_DIR)) fs.mkdirSync(STATE_BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const snapshot = path.join(STATE_BACKUP_DIR, `state-${stamp}.json`);
+    fs.writeFileSync(snapshot, json, "utf8");
+    fs.writeFileSync(path.join(STATE_BACKUP_DIR, "latest.json"), json, "utf8");
+    const files = fs
+      .readdirSync(STATE_BACKUP_DIR)
+      .filter((name) => /^state-.*\.json$/.test(name))
+      .sort();
+    if (files.length > MAX_STATE_BACKUPS) {
+      const remove = files.slice(0, files.length - MAX_STATE_BACKUPS);
+      for (const name of remove) {
+        fs.unlinkSync(path.join(STATE_BACKUP_DIR, name));
+      }
+    }
+  } catch (e) {
+    console.warn("[qr-magic] state backup skipped:", e && e.message ? e.message : e);
+  }
 }
 
 async function writeStateToSupabase(state) {
