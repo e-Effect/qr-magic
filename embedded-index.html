@@ -455,17 +455,21 @@
       sel.value = String(idx);
     }
 
-    function syncKeywordFromState() {
+    function syncKeywordFromState(opts = {}) {
+      if (opts && opts.clear) {
+        document.getElementById("keyword").value = "";
+        return;
+      }
       const q = (state.queries && state.queries[0]) || "";
       document.getElementById("keyword").value = q;
     }
 
-    function renderAll() {
+    function renderAll(opts = {}) {
       ensurePresets();
       document.getElementById("ticketStatus").textContent =
         "登録中の名刺用URL: " + (state.ticketCount != null ? state.ticketCount : 0) + " 本";
       renderTemplateBlock();
-      syncKeywordFromState();
+      syncKeywordFromState({ clear: !!opts.clearKeyword });
       renderTicketModeUi();
     }
 
@@ -597,8 +601,9 @@
           body: JSON.stringify({ ticketKeywordMode: mode }),
         });
         state = data.state;
+        document.getElementById("keyword").value = "";
         toast(mode === "frozen" ? "永久化にしました" : "リサイクルにしました");
-        renderAll();
+        renderAll({ clearKeyword: true });
       } catch (e) {
         toast(String(e.message || e));
       }
@@ -661,6 +666,7 @@
         gate.style.display = "none";
         appEl.style.display = "block";
         setSettingsFabVisible(true);
+        renderAll({ clearKeyword: true });
         startPublicUrlPoller();
       } catch (e) {
         localStorage.removeItem(LS);
