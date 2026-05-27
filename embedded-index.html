@@ -172,24 +172,6 @@
       flex-shrink: 0;
     }
     .settingsDrawerHead h2 { font-size: 0.95rem; margin: 0; }
-<<<<<<< HEAD
-    .settingsDrawerBody { padding: 0.85rem 1rem 1.25rem; overflow: auto; flex: 1; }
-    .settingsDrawerBody textarea { font-size: 0.72rem; font-family: ui-monospace, monospace; min-height: 12rem; }
-    .statusGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
-    .statusItem { border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.55rem; background: #fafafa; min-width: 0; }
-    .statusLabel { color: #71717a; font-size: 0.72rem; margin-bottom: 0.15rem; }
-    .statusValue { font-size: 0.92rem; font-weight: 700; word-break: break-word; }
-    .lockBanner { border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.55rem; background: #f0fdf4; color: #166534; font-weight: 700; margin-bottom: 0.55rem; }
-    .lockBanner--on { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
-    .qrStateList { display: grid; gap: 0.4rem; max-height: 18rem; overflow: auto; margin-top: 0.55rem; }
-    .qrStateRow { border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.55rem; background: #fafafa; }
-    .qrStateTop { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.18rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #e4e4e7; color: #18181b; white-space: nowrap; }
-    .badge--fixed { background: #dbeafe; color: #1d4ed8; }
-    .badge--hit { background: #dcfce7; color: #166534; }
-    button:disabled { opacity: 0.52; cursor: not-allowed; }
-    @media (max-width: 420px) { .statusGrid { grid-template-columns: 1fr; } }
-=======
     .settingsDrawerBody { padding: 0.75rem 0.85rem 1.25rem; overflow: auto; flex: 1; }
     .settingsDrawerBody textarea { font-size: 0.72rem; font-family: ui-monospace, monospace; min-height: 9rem; }
     .settingsSection { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin-bottom: 0.55rem; overflow: hidden; }
@@ -223,7 +205,6 @@
     @media (min-width: 720px) {
       body { padding-top: 1.6rem; }
     }
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
   </style>
 </head>
 <body>
@@ -343,61 +324,6 @@
 
   <div id="app" style="display:none">
     <div class="panel">
-      <h2>本番チェック</h2>
-      <div id="lockBanner" class="lockBanner">本番ロックなし</div>
-      <div class="statusGrid">
-        <div class="statusItem">
-          <div class="statusLabel">キーワード</div>
-          <div class="statusValue" id="preflightKeyword">-</div>
-        </div>
-        <div class="statusItem">
-          <div class="statusLabel">飛び先</div>
-          <div class="statusValue" id="preflightTemplate">-</div>
-        </div>
-        <div class="statusItem">
-          <div class="statusLabel">モード</div>
-          <div class="statusValue" id="preflightMode">-</div>
-        </div>
-        <div class="statusItem">
-          <div class="statusLabel">QR</div>
-          <div class="statusValue" id="preflightTickets">-</div>
-        </div>
-        <div class="statusItem">
-          <div class="statusLabel">保存先</div>
-          <div class="statusValue" id="preflightStorage">確認前</div>
-        </div>
-        <div class="statusItem">
-          <div class="statusLabel">巻き戻し</div>
-          <div class="statusValue" id="preflightUndo">-</div>
-        </div>
-      </div>
-      <div class="toolbar">
-        <button type="button" class="btn-secondary" id="btnRefreshPreflight">更新</button>
-        <button type="button" class="btn-secondary" id="btnUndoState">ひとつ戻す</button>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>本番ロック</h2>
-      <p id="productionLockLine" class="muted"></p>
-      <div class="toolbar">
-        <button type="button" class="btn-danger" id="btnProductionLock">ロックする</button>
-        <input type="text" id="productionUnlockWord" placeholder="解除" autocomplete="off" style="max-width:8rem" />
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>演目プリセット</h2>
-      <select id="showPresetSelect" aria-label="演目プリセット"></select>
-      <input type="text" id="showPresetLabel" placeholder="演目名" autocomplete="off" style="margin-top:0.5rem" />
-      <div class="toolbar">
-        <button type="button" class="btn-primary" id="btnSaveShowPreset">保存</button>
-        <button type="button" class="btn-secondary" id="btnApplyShowPreset">呼び出す</button>
-        <button type="button" class="btn-secondary" id="btnDeleteShowPreset">削除</button>
-      </div>
-      <p id="showPresetMeta" class="muted" style="margin:0.55rem 0 0"></p>
-    </div>
-    <div class="panel">
       <h2>テンプレート</h2>
       <select id="templateSelect" aria-label="テンプレート" style="margin-top:0.35rem"></select>
     </div>
@@ -419,34 +345,6 @@
         <button type="button" class="btn-secondary" id="btnPreviewKeyword">プレビュー</button>
       </div>
     </div>
-<<<<<<< HEAD
-
-    <div class="panel">
-      <h2>名刺用QR（1枚＝1URL）</h2>
-      <p class="muted">先に<strong>URLだけ</strong>をたくさん作り、名刺に<strong>それぞれ違うQR</strong>を印刷しておきます。</p>
-      <p class="muted"><strong>永久化</strong>で初回をずらすと名刺ごとに別の単語にできます。<strong>リサイクル</strong>は、まだ固定されていない名刺だけがキーワード変更に追従します。</p>
-      <p class="muted">飛び先はプルダウンで選んだテンプレートを使います。1回あたり最大5000枚。</p>
-      <p id="ticketStatus" class="muted"></p>
-      <label class="muted">枚数</label>
-      <input type="number" id="ticketCount" value="10" min="1" max="5000" style="width:6rem;margin-left:.35rem" />
-      <div class="toolbar" style="margin-top:0.5rem">
-        <button type="button" class="btn-primary" id="btnIssueTickets">名刺用URLを発行</button>
-        <button type="button" class="btn-danger" id="btnClearTickets">名刺用を全削除</button>
-      </div>
-      <label class="muted" style="display:block;margin-top:0.65rem">発行されたURL（1行1本・QRにしてください）</label>
-      <textarea id="ticketUrls" readonly rows="10" style="width:100%;font-size:.72rem;font-family:ui-monospace,monospace"></textarea>
-    </div>
-
-    <div class="panel">
-      <h2>QRごとの状態</h2>
-      <p id="qrStateSummary" class="muted" style="margin-top:0"></p>
-      <div class="toolbar">
-        <button type="button" class="btn-secondary" id="btnRefreshQrState">更新</button>
-      </div>
-      <div id="qrStateList" class="qrStateList"></div>
-    </div>
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
   </div>
 
   <p id="toast" style="display:none;position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:#181817;color:#f6f0e8;padding:.6rem 1rem;border-radius:8px;z-index:120"></p>
@@ -461,10 +359,6 @@
     let state = null;
     let publicBaseUrl = "";
     let qrStateRows = [];
-<<<<<<< HEAD
-    let storageHealthText = "確認前";
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
 
     function toast(msg) {
       const t = document.getElementById("toast");
@@ -527,7 +421,6 @@
     function renderAdminCodePanel() {
       const panel = document.getElementById("adminCodePanel");
       panel.style.display = isAdminActor() ? "block" : "none";
-      lockDangerButtons();
     }
 
     function renderSettingsSummaries() {
@@ -579,7 +472,6 @@
     }
 
     async function issueCodesBulk() {
-      if (isProductionLockOn()) return toast("本番ロック中です");
       const n = parseInt(document.getElementById("adminIssueCount").value, 10);
       if (!Number.isFinite(n) || n < 1 || n > 5000) return toast("発行数は1〜5000");
       try {
@@ -595,7 +487,6 @@
     }
 
     async function revokeCodeById() {
-      if (isProductionLockOn()) return toast("本番ロック中です");
       const id = String(document.getElementById("adminRevokeCode").value || "").trim();
       if (!/^\d{8}$/.test(id)) return toast("8桁IDを入力してください");
       if (!confirm(id + " を停止します。よろしいですか？")) return;
@@ -683,107 +574,6 @@
       return state && state.ticketKeywordMode === "recycle" ? "recycle" : "frozen";
     }
 
-<<<<<<< HEAD
-    function activeTemplateIndex() {
-      ensurePresets();
-      const raw = parseInt(document.getElementById("templateSelect").value, 10);
-      if (Number.isFinite(raw) && raw >= 0 && raw < state.templatePresets.length) return raw;
-      const idx = parseInt(state.activeTemplateIndex, 10);
-      return Number.isFinite(idx) && idx >= 0 && idx < state.templatePresets.length ? idx : 0;
-    }
-
-    function activeTemplatePreset() {
-      ensurePresets();
-      return state.templatePresets[activeTemplateIndex()] || state.templatePresets[0] || { label: "-", template: "" };
-    }
-
-    function isProductionLockOn() {
-      return !!(state && state.productionLock);
-    }
-
-    function setDisabled(id, on) {
-      const el = document.getElementById(id);
-      if (el) el.disabled = !!on;
-    }
-
-    function lockDangerButtons() {
-      const locked = isProductionLockOn();
-      setDisabled("btnIssueTickets", locked);
-      setDisabled("btnClearTickets", locked);
-      setDisabled("btnAdminIssueCodes", locked);
-      setDisabled("btnAdminRevokeCode", locked);
-    }
-
-    function renderProductionLock() {
-      const locked = isProductionLockOn();
-      const banner = document.getElementById("lockBanner");
-      if (banner) {
-        banner.textContent = locked ? "本番ロック中" : "本番ロックなし";
-        banner.classList.toggle("lockBanner--on", locked);
-      }
-      const line = document.getElementById("productionLockLine");
-      if (line) line.textContent = locked ? "発行、全削除、ID発行、ID停止を止めています。" : "危ない操作は通常どおり使えます。";
-      const btn = document.getElementById("btnProductionLock");
-      if (btn) {
-        btn.textContent = locked ? "ロック解除" : "ロックする";
-        btn.className = locked ? "btn-secondary" : "btn-danger";
-      }
-      lockDangerButtons();
-    }
-
-    function renderPreflight() {
-      if (!state) return;
-      const kw = (document.getElementById("keyword").value || (state.queries && state.queries[0]) || "").trim();
-      const preset = activeTemplatePreset();
-      document.getElementById("preflightKeyword").textContent = kw || "未設定";
-      document.getElementById("preflightTemplate").textContent = preset.label || "未設定";
-      document.getElementById("preflightMode").textContent = ticketKeywordMode() === "recycle" ? "リサイクル" : "永久化";
-      document.getElementById("preflightTickets").textContent = (state.ticketCount != null ? state.ticketCount : 0) + " 本";
-      document.getElementById("preflightStorage").textContent = storageHealthText;
-      document.getElementById("preflightUndo").textContent = state.undoAvailable ? "あり" : "なし";
-      setDisabled("btnUndoState", !state.undoAvailable);
-    }
-
-    async function refreshStorageHealth() {
-      const el = document.getElementById("preflightStorage");
-      if (el) el.textContent = "確認中";
-      try {
-        const r = await fetch("/api/storage-health", { headers: authHeaders() });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.message || r.statusText);
-        storageHealthText = j.storage === "supabase" ? "Supabase OK" : "ローカル保存";
-      } catch (e) {
-        storageHealthText = "確認不可";
-      }
-      renderPreflight();
-    }
-
-    function renderShowPresets() {
-      const sel = document.getElementById("showPresetSelect");
-      if (!sel || !state) return;
-      const presets = Array.isArray(state.showPresets) ? state.showPresets : [];
-      const before = sel.value;
-      sel.innerHTML = "";
-      if (!presets.length) {
-        const o = document.createElement("option");
-        o.value = "-1";
-        o.textContent = "未保存";
-        sel.appendChild(o);
-      } else {
-        presets.forEach((p, i) => {
-          const o = document.createElement("option");
-          o.value = String(i);
-          o.textContent = p.label || `演目 ${i + 1}`;
-          sel.appendChild(o);
-        });
-        if (before && Number(before) >= 0 && Number(before) < presets.length) sel.value = before;
-      }
-      const meta = document.getElementById("showPresetMeta");
-      if (meta) meta.textContent = presets.length + " / 20";
-    }
-
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     function qrStateLabel(row) {
       if (row && row.queryBound) return "固定済み";
       if (row && Number(row.hitCount || 0) > 0) return "読取済み";
@@ -828,8 +618,6 @@
       }
     }
 
-<<<<<<< HEAD
-=======
     async function refreshQrState() {
       try {
         const d = await api("/api/tickets/history");
@@ -840,7 +628,6 @@
       }
     }
 
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     function renderTicketModeUi() {
       const m = ticketKeywordMode();
       document.getElementById("btnModeRecycle").className = m === "recycle" ? "btn-primary" : "btn-secondary";
@@ -890,14 +677,7 @@
       renderTemplateBlock();
       syncKeywordFromState({ clear: !!opts.clearKeyword });
       renderTicketModeUi();
-<<<<<<< HEAD
-      renderProductionLock();
-      renderShowPresets();
-      renderPreflight();
-      renderQrState();
-=======
       renderSettingsSummaries();
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     }
 
     async function load() {
@@ -946,24 +726,6 @@
       }
     }
 
-<<<<<<< HEAD
-    async function refreshPreflight() {
-      renderPreflight();
-      await refreshStorageHealth();
-    }
-
-    async function refreshQrState() {
-      try {
-        const d = await api("/api/tickets/history");
-        qrStateRows = Array.isArray(d.tickets) ? d.tickets : [];
-        renderQrState();
-      } catch (e) {
-        toast(String(e.message || e));
-      }
-    }
-
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     async function undoState() {
       try {
         const data = await api("/api/state/undo", { method: "POST", body: JSON.stringify({}) });
@@ -975,101 +737,6 @@
       }
     }
 
-<<<<<<< HEAD
-    async function toggleProductionLock() {
-      const next = !isProductionLockOn();
-      if (!next) {
-        const word = String(document.getElementById("productionUnlockWord").value || "").trim();
-        if (word !== "解除") return toast("解除 と入力してください");
-      }
-      try {
-        await putState({ productionLock: next });
-        if (!next) document.getElementById("productionUnlockWord").value = "";
-        toast(next ? "本番ロックしました" : "本番ロックを解除しました");
-        renderAll();
-      } catch (e) {
-        toast(String(e.message || e));
-      }
-    }
-
-    async function saveShowPreset() {
-      if (!state) return;
-      const preset = activeTemplatePreset();
-      const query = document.getElementById("keyword").value.trim() || (state.queries && state.queries[0]) || "";
-      if (!query) return toast("キーワードを入れてください");
-      const labelInput = document.getElementById("showPresetLabel");
-      const label = String(labelInput.value || "").trim() || query;
-      const item = {
-        label,
-        query,
-        template: preset.template,
-        templateLabel: preset.label,
-        ticketKeywordMode: ticketKeywordMode(),
-        createdAt: new Date().toISOString(),
-      };
-      const presets = Array.isArray(state.showPresets) ? state.showPresets.slice() : [];
-      const same = presets.findIndex((p) => String(p.label || "") === label);
-      if (same >= 0) presets[same] = item;
-      else presets.push(item);
-      while (presets.length > 20) presets.shift();
-      try {
-        await putState({ showPresets: presets });
-        labelInput.value = "";
-        toast("演目を保存しました");
-        renderAll();
-      } catch (e) {
-        toast(String(e.message || e));
-      }
-    }
-
-    async function applyShowPreset() {
-      const presets = Array.isArray(state && state.showPresets) ? state.showPresets : [];
-      const idx = parseInt(document.getElementById("showPresetSelect").value, 10);
-      if (!Number.isFinite(idx) || idx < 0 || idx >= presets.length) return toast("演目がありません");
-      const p = presets[idx];
-      const templatePresets = presetsFromState();
-      let activeIdx = templatePresets.findIndex((x) => x.template === p.template);
-      if (activeIdx < 0 && p.template && p.template.includes("{query}")) {
-        if (templatePresets.length < 20) {
-          activeIdx = templatePresets.length;
-          templatePresets.push({ label: p.templateLabel || p.label || "演目", template: p.template });
-        } else {
-          activeIdx = activeTemplateIndex();
-          templatePresets[activeIdx] = { label: p.templateLabel || p.label || "演目", template: p.template };
-        }
-      }
-      if (activeIdx < 0) activeIdx = activeTemplateIndex();
-      try {
-        await putState({
-          queries: [p.query || ""],
-          templatePresets,
-          activeTemplateIndex: activeIdx,
-          ticketKeywordMode: p.ticketKeywordMode === "recycle" ? "recycle" : "frozen",
-        });
-        document.getElementById("keyword").value = p.query || "";
-        toast("演目を呼び出しました");
-        renderAll();
-      } catch (e) {
-        toast(String(e.message || e));
-      }
-    }
-
-    async function deleteShowPreset() {
-      const presets = Array.isArray(state && state.showPresets) ? state.showPresets.slice() : [];
-      const idx = parseInt(document.getElementById("showPresetSelect").value, 10);
-      if (!Number.isFinite(idx) || idx < 0 || idx >= presets.length) return toast("演目がありません");
-      presets.splice(idx, 1);
-      try {
-        await putState({ showPresets: presets });
-        toast("演目を削除しました");
-        renderAll();
-      } catch (e) {
-        toast(String(e.message || e));
-      }
-    }
-
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     document.getElementById("templateSelect").addEventListener("change", async (e) => {
       const idx = parseInt(e.target.value, 10);
       if (!Number.isFinite(idx) || !state) return;
@@ -1117,21 +784,6 @@
     document.getElementById("btnAdminIssueCodes").onclick = () => issueCodesBulk();
     document.getElementById("btnAdminRefreshCodes").onclick = () => loadAdminCodesIntoDrawer();
     document.getElementById("btnAdminRevokeCode").onclick = () => revokeCodeById();
-<<<<<<< HEAD
-    document.getElementById("btnRefreshPreflight").onclick = () => refreshPreflight();
-    document.getElementById("btnUndoState").onclick = () => undoState();
-    document.getElementById("btnProductionLock").onclick = () => toggleProductionLock();
-    document.getElementById("btnSaveShowPreset").onclick = () => saveShowPreset();
-    document.getElementById("btnApplyShowPreset").onclick = () => applyShowPreset();
-    document.getElementById("btnDeleteShowPreset").onclick = () => deleteShowPreset();
-    document.getElementById("btnRefreshQrState").onclick = () => refreshQrState();
-    document.getElementById("keyword").addEventListener("input", () => renderPreflight());
-    document.getElementById("showPresetSelect").addEventListener("change", () => {
-      const presets = Array.isArray(state && state.showPresets) ? state.showPresets : [];
-      const idx = parseInt(document.getElementById("showPresetSelect").value, 10);
-      document.getElementById("showPresetLabel").value =
-        Number.isFinite(idx) && idx >= 0 && idx < presets.length ? presets[idx].label || "" : "";
-=======
     document.getElementById("btnUndoState").onclick = () => undoState();
     document.getElementById("btnRefreshQrState").onclick = () => refreshQrState();
 
@@ -1146,7 +798,6 @@
     });
     document.getElementById("adminCodePanel").addEventListener("toggle", (e) => {
       if (e.target.open) loadAdminCodesIntoDrawer();
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     });
 
     document.addEventListener("keydown", (e) => {
@@ -1193,7 +844,6 @@
     document.getElementById("btnModeRecycle").onclick = () => setTicketKeywordMode("recycle");
 
     document.getElementById("btnIssueTickets").onclick = () => {
-      if (isProductionLockOn()) return toast("本番ロック中です");
       const n = parseInt(document.getElementById("ticketCount").value, 10);
       if (!Number.isFinite(n) || n < 1 || n > 5000) return toast("枚数は1〜5000");
       api("/api/tickets/bulk", { method: "POST", body: JSON.stringify({ count: n }) })
@@ -1204,16 +854,11 @@
           document.getElementById("ticketUrls").value = lines.join("\n");
           toast("発行しました");
           renderAll();
-<<<<<<< HEAD
-          refreshQrState();
-=======
           if (document.getElementById("settingsQrStateSection").open) refreshQrState();
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
         })
         .catch((e) => toast(String(e.message || e)));
     };
     document.getElementById("btnClearTickets").onclick = () => {
-      if (isProductionLockOn()) return toast("本番ロック中です");
       if (!confirm("名刺用URLをすべて削除します。よろしいですか？")) return;
       api("/api/tickets/clear", { method: "POST", body: JSON.stringify({ confirm: true }) })
         .then((d) => {
@@ -1221,11 +866,7 @@
           document.getElementById("ticketUrls").value = "";
           toast("削除しました");
           renderAll();
-<<<<<<< HEAD
-          refreshQrState();
-=======
           if (document.getElementById("settingsQrStateSection").open) refreshQrState();
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
         })
         .catch((e) => toast(String(e.message || e)));
     };
@@ -1260,8 +901,6 @@
         appEl.style.display = "block";
         setSettingsFabVisible(true);
         renderAll({ clearKeyword: true });
-        refreshPreflight();
-        refreshQrState();
         startPublicUrlPoller();
       } catch (e) {
         localStorage.removeItem(LS);
