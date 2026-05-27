@@ -100,7 +100,7 @@ function defaultState() {
   const amazonJp = "https://www.amazon.co.jp/s?k={query}";
   const spotify = "https://open.spotify.com/search/{query}";
   const appleMusic = "https://music.apple.com/jp/search?term={query}";
-  const lineText = "https://line.me/R/msg/text/?{query}";
+  const cookpad = "https://cookpad.com/jp/search/{query}";
   return {
     queries: [""],
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
@@ -111,7 +111,7 @@ function defaultState() {
       { label: "Amazon 商品検索", template: amazonJp },
       { label: "Spotify 検索", template: spotify },
       { label: "Apple Music 検索", template: appleMusic },
-      { label: "LINE で送る", template: lineText },
+      { label: "Cookpad \u30ec\u30b7\u30d4\u691c\u7d22", template: cookpad },
       { label: "YouTube 即再生(近似)", template: ytTop },
       { label: "YouTube \u5f85\u6a5f\u518d\u751f", template: ytLive },
     ],
@@ -170,13 +170,15 @@ function migrateTemplatePresets(merged) {
       ? [{ label: "既定", template: legacy }]
       : [{ ...base.templatePresets[0] }];
   }
-  merged.templatePresets = (merged.templatePresets || []).map((p) => {
-    const t = String((p && p.template) || "");
-    if (t === "https://www.google.com/maps/search?q={query}") {
-      return { ...p, template: MAPS_SEARCH_TEMPLATE };
-    }
-    return { ...p };
-  });
+  merged.templatePresets = (merged.templatePresets || [])
+    .filter((p) => !String((p && p.template) || "").includes("line.me/R/msg/text"))
+    .map((p) => {
+      const t = String((p && p.template) || "");
+      if (t === "https://www.google.com/maps/search?q={query}") {
+        return { ...p, template: MAPS_SEARCH_TEMPLATE };
+      }
+      return { ...p };
+    });
   const hasMaps = merged.templatePresets.some((p) => String(p.template || "").includes("google.com/maps"));
   if (!hasMaps && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
     merged.templatePresets.push({ label: "Google マップ", template: MAPS_SEARCH_TEMPLATE });
@@ -189,12 +191,15 @@ function migrateTemplatePresets(merged) {
   if (!hasYouTubeLive && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
     merged.templatePresets.push({ label: "YouTube \u5f85\u6a5f\u518d\u751f", template: "{host}/yt-live?seed={query}" });
   }
+  const hasCookpad = merged.templatePresets.some((p) => String(p.template || "").includes("cookpad.com/jp/search"));
+  if (!hasCookpad && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
+    merged.templatePresets.push({ label: "Cookpad \u30ec\u30b7\u30d4\u691c\u7d22", template: "https://cookpad.com/jp/search/{query}" });
+  }
   const extraPresets = [
     { label: "Wikipedia（日本語）", template: "https://ja.wikipedia.org/wiki/Special:Search?search={query}" },
     { label: "Amazon 商品検索", template: "https://www.amazon.co.jp/s?k={query}" },
     { label: "Spotify 検索", template: "https://open.spotify.com/search/{query}" },
     { label: "Apple Music 検索", template: "https://music.apple.com/jp/search?term={query}" },
-    { label: "LINE で送る", template: "https://line.me/R/msg/text/?{query}" },
   ];
   for (const extra of extraPresets) {
     const exists = merged.templatePresets.some((p) => String((p && p.template) || "").trim() === extra.template);
