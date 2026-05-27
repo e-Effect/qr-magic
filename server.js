@@ -963,14 +963,19 @@ function renderGoogleWaitPage() {
 <style>
 *{box-sizing:border-box}
 html,body{width:100%;height:100%;margin:0;background:#fff;overflow:hidden}
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111}
-.mark{position:fixed;left:50%;top:50%;width:1.85rem;height:1.85rem;margin:-.925rem 0 0 -.925rem;border:.18rem solid #eee;border-top-color:#bbb;border-radius:999px;animation:spin .9s linear infinite;opacity:.46}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;display:grid;place-items:center}
+.wait{display:grid;place-items:center;gap:1rem;text-align:center}
+.mark{width:1.85rem;height:1.85rem;border:.18rem solid #eee;border-top-color:#999;border-radius:999px;animation:spin .9s linear infinite;opacity:.7}
+.wait p{margin:0;font-size:1rem;font-weight:600;letter-spacing:0;color:#555}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.mark{animation:none}}
 </style>
 </head>
 <body>
+<main class="wait" aria-live="polite">
 <div class="mark" aria-hidden="true"></div>
+<p>&#24453;&#27231;&#20013;</p>
+</main>
 <script>
 (function(){
   var apiUrl = "/api/google-wait/current";
