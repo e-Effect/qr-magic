@@ -95,6 +95,7 @@ function defaultState() {
   const google = "https://www.google.com/search?q={query}";
   const maps = MAPS_SEARCH_TEMPLATE;
   const ytTop = "{host}/yt-top?q={query}";
+  const ytLive = "{host}/yt-live?seed={query}";
   const wikiJa = "https://ja.wikipedia.org/wiki/Special:Search?search={query}";
   const amazonJp = "https://www.amazon.co.jp/s?k={query}";
   const spotify = "https://open.spotify.com/search/{query}";
@@ -112,6 +113,7 @@ function defaultState() {
       { label: "Apple Music 検索", template: appleMusic },
       { label: "LINE で送る", template: lineText },
       { label: "YouTube 即再生(近似)", template: ytTop },
+      { label: "YouTube \u5f85\u6a5f\u518d\u751f", template: ytLive },
     ],
     activeTemplateIndex: 0,
     /** 互換・内部同期用（= templatePresets[activeTemplateIndex].template） */
@@ -182,6 +184,10 @@ function migrateTemplatePresets(merged) {
   const hasYouTubeTop = merged.templatePresets.some((p) => String(p.template || "").includes("/yt-top?q={query}"));
   if (!hasYouTubeTop && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
     merged.templatePresets.push({ label: "YouTube 即再生(近似)", template: "{host}/yt-top?q={query}" });
+  }
+  const hasYouTubeLive = merged.templatePresets.some((p) => String(p.template || "").includes("/yt-live"));
+  if (!hasYouTubeLive && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
+    merged.templatePresets.push({ label: "YouTube \u5f85\u6a5f\u518d\u751f", template: "{host}/yt-live?seed={query}" });
   }
   const extraPresets = [
     { label: "Wikipedia（日本語）", template: "https://ja.wikipedia.org/wiki/Special:Search?search={query}" },
@@ -662,6 +668,14 @@ function youtubeWatchUrl(videoId) {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
 }
 
+function youtubeEmbedUrl(videoId) {
+  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?playsinline=1&rel=0`;
+}
+
+function isYouTubeLiveTemplate(template) {
+  return String(template || "").includes("/yt-live");
+}
+
 async function pickFirstYouTubeSearchVideoId(query) {
   const q = String(query || "").trim();
   if (!q) return null;
@@ -701,6 +715,220 @@ async function pickPlayableYouTubeVideoId(query) {
     console.error("[yt-top search]", e && e.message ? e.message : e);
   }
   return null;
+}
+
+const YOUTUBE_RESOLVE_CACHE_TTL_MS = 10 * 60 * 1000;
+const YOUTUBE_RESOLVE_FAILURE_TTL_MS = 15 * 1000;
+const youtubeResolveCache = new Map();
+
+async function getCachedPlayableYouTubeVideoId(query) {
+  const q = String(query || "").trim();
+  if (!q) return null;
+  const key = q.toLowerCase();
+  const now = Date.now();
+  const cached = youtubeResolveCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    if (cached.promise) return cached.promise;
+    return cached.videoId || null;
+  }
+
+  const promise = pickPlayableYouTubeVideoId(q)
+    .then((videoId) => {
+      const cleanId = isYouTubeVideoId(videoId) ? videoId : null;
+      youtubeResolveCache.set(key, {
+        videoId: cleanId,
+        expiresAt: Date.now() + (cleanId ? YOUTUBE_RESOLVE_CACHE_TTL_MS : YOUTUBE_RESOLVE_FAILURE_TTL_MS),
+      });
+      while (youtubeResolveCache.size > 100) {
+        const first = youtubeResolveCache.keys().next().value;
+        youtubeResolveCache.delete(first);
+      }
+      return cleanId;
+    })
+    .catch((e) => {
+      youtubeResolveCache.set(key, {
+        videoId: null,
+        expiresAt: Date.now() + YOUTUBE_RESOLVE_FAILURE_TTL_MS,
+      });
+      throw e;
+    });
+
+  youtubeResolveCache.set(key, { promise, expiresAt: now + 30 * 1000 });
+  return promise;
+}
+
+function renderYouTubeLivePage() {
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>YouTube Play</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;background:#030303;overflow:hidden}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff}
+#playerWrap{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .22s ease}
+#playerWrap.active{opacity:1;pointer-events:auto}
+#ytPlayer{position:absolute;inset:0;width:100%;height:100%}
+#cover{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,#181818 0,#080808 48%,#000 100%);transition:opacity .22s ease}
+#cover.hidden{opacity:0;pointer-events:none}
+#play{width:min(42vw,11.5rem);height:min(42vw,11.5rem);min-width:7rem;min-height:7rem;border:1px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(255,255,255,.94);box-shadow:0 1.4rem 4rem rgba(0,0,0,.55),inset 0 0 0 .7rem rgba(0,0,0,.04);display:grid;place-items:center;cursor:pointer;transition:transform .16s ease,opacity .16s ease,box-shadow .16s ease}
+#play:active{transform:scale(.96)}
+#play.ready{box-shadow:0 1.4rem 4rem rgba(0,0,0,.55),0 0 0 .5rem rgba(255,255,255,.12),inset 0 0 0 .7rem rgba(0,0,0,.04)}
+#play.waiting{opacity:.72}
+#play:before{content:"";display:block;width:0;height:0;border-top:1.55rem solid transparent;border-bottom:1.55rem solid transparent;border-left:2.35rem solid #050505;margin-left:.45rem}
+@media (max-width:520px){#play:before{border-top-width:1.25rem;border-bottom-width:1.25rem;border-left-width:1.9rem;margin-left:.35rem}}
+</style>
+</head>
+<body>
+<div id="playerWrap"><div id="ytPlayer"></div></div>
+<div id="cover"><button id="play" type="button" aria-label="Play"></button></div>
+<script>
+(function(){
+  var apiUrl = "/api/youtube-live/current";
+  var latest = null;
+  var player = null;
+  var playerReady = false;
+  var pendingPlay = false;
+  var lastVideoId = "";
+  var play = document.getElementById("play");
+  var cover = document.getElementById("cover");
+  var wrap = document.getElementById("playerWrap");
+
+  function seedQuery() {
+    try {
+      return new URLSearchParams(location.search).get("seed") || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function currentApiUrl() {
+    var url = apiUrl + "?_=" + Date.now();
+    var seed = seedQuery();
+    if (seed) url += "&seed=" + encodeURIComponent(seed);
+    return url;
+  }
+
+  function showPlayer() {
+    wrap.classList.add("active");
+    cover.classList.add("hidden");
+  }
+
+  function allowPlayerAutoplay() {
+    try {
+      var frame = player && player.getIframe ? player.getIframe() : null;
+      if (!frame) return;
+      frame.setAttribute("allow", "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen");
+      frame.setAttribute("allowfullscreen", "");
+    } catch (_) {}
+  }
+
+  function ensurePlayer() {
+    if (player || !latest || !latest.videoId || !window.YT || !YT.Player) return;
+    player = new YT.Player("ytPlayer", {
+      width: "100%",
+      height: "100%",
+      videoId: latest.videoId,
+      playerVars: {
+        playsinline: 1,
+        controls: 1,
+        rel: 0,
+        origin: location.origin
+      },
+      events: {
+        onReady: function() {
+          playerReady = true;
+          allowPlayerAutoplay();
+          lastVideoId = "";
+          if (pendingPlay) {
+            pendingPlay = false;
+            startLoadedVideo();
+          } else {
+            cueLatest();
+          }
+        },
+        onAutoplayBlocked: function() {
+          showPlayer();
+        }
+      }
+    });
+  }
+
+  function cueLatest() {
+    if (!latest || !latest.videoId || !playerReady || !player) return;
+    if (latest.videoId === lastVideoId) return;
+    try {
+      player.cueVideoById(latest.videoId);
+      lastVideoId = latest.videoId;
+    } catch (_) {}
+  }
+
+  function startLoadedVideo() {
+    if (!latest || !latest.videoId) return false;
+    showPlayer();
+    if (!player) ensurePlayer();
+    if (!playerReady || !player) {
+      pendingPlay = true;
+      return false;
+    }
+    try {
+      if (latest.videoId !== lastVideoId) {
+        player.loadVideoById(latest.videoId);
+        lastVideoId = latest.videoId;
+      }
+      player.playVideo();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function refresh() {
+    try {
+      var r = await fetch(currentApiUrl(), { cache: "no-store" });
+      var j = await r.json();
+      if (!j || !j.ok || !j.hasQuery || !j.videoId) {
+        latest = null;
+        play.classList.remove("ready");
+        return null;
+      }
+      latest = j;
+      play.classList.add("ready");
+      ensurePlayer();
+      cueLatest();
+      return j;
+    } catch (_) {
+      return latest;
+    }
+  }
+
+  play.addEventListener("click", async function() {
+    play.classList.add("waiting");
+    if (!latest || !latest.videoId) await refresh();
+    if (!latest || !latest.videoId) {
+      play.classList.remove("waiting");
+      return;
+    }
+    startLoadedVideo();
+    play.classList.remove("waiting");
+  });
+
+  window.onYouTubeIframeAPIReady = function() {
+    ensurePlayer();
+  };
+
+  var tag = document.createElement("script");
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(tag);
+
+  refresh();
+  setInterval(refresh, 1000);
+})();
+</script>
+</body>
+</html>`;
 }
 
 async function pickTopViewedYouTubeVideoId(query) {
@@ -846,6 +1074,42 @@ app.get("/api/public-qr-hint", (req, res) => {
   res.json({ ok: true, publicBaseUrl: base || null });
 });
 
+app.get("/yt-live", (_req, res) => {
+  res.type("html").send(renderYouTubeLivePage());
+});
+
+app.get("/api/youtube-live/current", async (req, res) => {
+  let state;
+  try {
+    state = await readState();
+  } catch (e) {
+    console.error(e);
+    return res.status(503).json(storageErrorResponse("read", e));
+  }
+
+  const seed = String((req.query && req.query.seed) || "").trim();
+  const query = firstNonEmptyQuery(state) || seed;
+  if (!query) {
+    return res.json({ ok: true, hasQuery: false, query: "", videoId: null, embedUrl: null, watchUrl: null });
+  }
+
+  let videoId = null;
+  try {
+    videoId = await getCachedPlayableYouTubeVideoId(query);
+  } catch (e) {
+    console.error("[yt-live]", e && e.message ? e.message : e);
+  }
+
+  res.json({
+    ok: true,
+    hasQuery: true,
+    query,
+    videoId: videoId || null,
+    embedUrl: videoId ? youtubeEmbedUrl(videoId) : null,
+    watchUrl: videoId ? youtubeWatchUrl(videoId) : youtubeSearchFallbackUrl(query),
+  });
+});
+
 /** 曲名などを受け取り、YouTubeの再生数上位動画へ直接リダイレクト（APIキー未設定時は検索結果へ） */
 app.get("/yt-top", async (req, res) => {
   const q = String((req.query && req.query.q) || "").trim();
@@ -935,9 +1199,12 @@ app.get("/r/:token", async (req, res) => {
       t.template && String(t.template).includes("{query}")
         ? String(t.template)
         : state.serviceTemplate || defaultState().serviceTemplate;
+    const liveYouTubeTemplate = isYouTubeLiveTemplate(tmpl);
     let chosenQuery = null;
 
-    if (ticketQueryBound(t)) {
+    if (liveYouTubeTemplate) {
+      chosenQuery = firstNonEmptyQuery(state) || "";
+    } else if (ticketQueryBound(t)) {
       chosenQuery = String(t.query || "").trim();
     } else if (recycle) {
       const live = firstNonEmptyQuery(state);
