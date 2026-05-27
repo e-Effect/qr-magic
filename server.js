@@ -626,6 +626,12 @@ function isGoogleWaitTemplate(template) {
   return s.includes("/g?hold={query}") || s.includes("/search-wait");
 }
 
+function injectRedirectTemplate(state) {
+  const current = String((state && state.serviceTemplate) || "").trim();
+  if (current.includes("{query}") && !isGoogleWaitTemplate(current)) return current;
+  return defaultState().serviceTemplate;
+}
+
 function getAudienceBaseUrl(req) {
   return getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`;
 }
@@ -1003,9 +1009,10 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
     try {
       var j = await loadCurrent();
       var key = j && j.key ? String(j.key) : "";
-      if (j && j.ok && j.hasQuery && j.googleUrl && key && key !== baselineKey) {
+      var nextUrl = j && (j.redirectUrl || j.googleUrl);
+      if (j && j.ok && j.hasQuery && nextUrl && key && key !== baselineKey) {
         redirecting = true;
-        location.replace(j.googleUrl);
+        location.replace(nextUrl);
       }
     } catch (_) {}
   }
@@ -1169,7 +1176,7 @@ app.get(["/g", "/search-wait"], (_req, res) => {
   res.type("html").send(renderGoogleWaitPage());
 });
 
-app.get("/api/google-wait/current", async (_req, res) => {
+app.get("/api/google-wait/current", async (req, res) => {
   let state;
   try {
     state = await readState();
@@ -1181,12 +1188,15 @@ app.get("/api/google-wait/current", async (_req, res) => {
   const query = firstNonEmptyQuery(state) || "";
   const updatedAt = typeof state.queryUpdatedAt === "string" && state.queryUpdatedAt ? state.queryUpdatedAt : null;
   const key = query ? `${updatedAt || "legacy"}:${query}` : updatedAt || "";
+  const template = injectRedirectTemplate(state);
+  const redirectUrl = query ? buildUrl(template, query, req) : null;
   res.json({
     ok: true,
     hasQuery: Boolean(query),
     query,
     updatedAt,
     key,
+    redirectUrl,
     googleUrl: query ? googleSearchUrl(query) : null,
   });
 });
