@@ -658,29 +658,8 @@ function isYouTubeVideoId(value) {
   return /^[A-Za-z0-9_-]{11}$/.test(String(value || ""));
 }
 
-function htmlEscape(value) {
-  return String(value == null ? "" : value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function youtubeWatchUrl(videoId) {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
-}
-
-function youtubeEmbedUrl(videoId, origin) {
-  const params = new URLSearchParams({
-    autoplay: "1",
-    playsinline: "1",
-    rel: "0",
-    controls: "1",
-    enablejsapi: "1",
-    origin: origin || "",
-  });
-  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`;
 }
 
 async function pickFirstYouTubeSearchVideoId(query) {
@@ -722,49 +701,6 @@ async function pickPlayableYouTubeVideoId(query) {
     console.error("[yt-top search]", e && e.message ? e.message : e);
   }
   return null;
-}
-
-function renderYouTubeAutoplayPage({ query, videoId, origin }) {
-  const safeQuery = htmlEscape(query);
-  const watchUrl = youtubeWatchUrl(videoId);
-  const embedUrl = youtubeEmbedUrl(videoId, origin);
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YouTube - ${safeQuery}</title>
-  <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #080808; color: #f6f0e8; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #080808; }
-    .wrap { width: min(100vw, 960px); padding: 1rem; }
-    .frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid rgba(255,255,255,.14); box-shadow: 0 24px 70px rgba(0,0,0,.55); }
-    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-    .bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .9rem; color: #a9a39a; font-size: .86rem; }
-    .query { color: #d7b56d; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .play { appearance: none; border: 1px solid rgba(215,181,109,.42); border-radius: 999px; background: #d7b56d; color: #17120b; padding: .72rem 1rem; font-weight: 900; text-decoration: none; white-space: nowrap; }
-    .hint { margin: .75rem 0 0; color: #77716a; font-size: .8rem; text-align: center; }
-    @media (max-width: 560px) { .wrap { padding: .65rem; } .bar { align-items: stretch; flex-direction: column; } .play { text-align: center; } }
-  </style>
-</head>
-<body>
-  <main class="wrap">
-    <div class="frame">
-      <iframe
-        src="${htmlEscape(embedUrl)}"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen
-        referrerpolicy="strict-origin-when-cross-origin"></iframe>
-    </div>
-    <div class="bar">
-      <div><span class="query">${safeQuery}</span></div>
-      <a class="play" href="${htmlEscape(watchUrl)}">再生する</a>
-    </div>
-    <p class="hint">音が出ない場合は「再生する」をタップしてください。</p>
-  </main>
-</body>
-</html>`;
 }
 
 async function pickTopViewedYouTubeVideoId(query) {
@@ -914,11 +850,9 @@ app.get("/api/public-qr-hint", (req, res) => {
 app.get("/yt-top", async (req, res) => {
   const q = String((req.query && req.query.q) || "").trim();
   if (!q) return res.redirect(302, "https://www.youtube.com/");
-  const origin = `${req.protocol}://${req.get("host")}`;
   const videoId = await pickPlayableYouTubeVideoId(q);
   if (videoId) {
-    res.set("Cache-Control", "no-store");
-    return res.send(renderYouTubeAutoplayPage({ query: q, videoId, origin }));
+    return res.redirect(302, youtubeWatchUrl(videoId));
   }
   return res.redirect(302, youtubeSearchFallbackUrl(q));
 });
