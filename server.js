@@ -1427,13 +1427,20 @@ app.put("/api/state", authRequired, async (req, res) => {
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
   const body = req.body || {};
+  const hasTemplateFields =
+    Array.isArray(body.templatePresets) ||
+    body.activeTemplateIndex !== undefined ||
+    body.serviceTemplate !== undefined;
+  const shouldCommitQuery =
+    Array.isArray(body.queries) &&
+    (body.commitQuery === true || (body.commitQuery !== false && !hasTemplateFields));
   const next = {
     ...cur,
     queries: normalizeQueriesToSingle(
-      Array.isArray(body.queries) ? body.queries.map((q) => String(q)) : cur.queries
+      shouldCommitQuery ? body.queries.map((q) => String(q)) : cur.queries
     ),
   };
-  if (Array.isArray(body.queries)) {
+  if (shouldCommitQuery) {
     next.queryUpdatedAt = new Date().toISOString();
   }
 

@@ -712,6 +712,7 @@
             ? extra.activeTemplateIndex
             : parseInt(document.getElementById("templateSelect").value, 10) || 0,
         ticketKeywordMode: ticketKeywordMode(),
+        commitQuery: true,
         ...payloadExtra,
       });
     }
@@ -746,19 +747,22 @@
         if (!presets.every((p) => p.template.includes("{query}"))) {
           toast("各プリセットに {query} が必要です");
           renderAll();
+          document.getElementById("keyword").value = kw;
           return;
         }
         await putState({
-          queries: [kw],
           templatePresets: presets,
           activeTemplateIndex: idx,
           ticketKeywordMode: ticketKeywordMode(),
+          commitQuery: false,
         });
         toast("切り替えました");
         renderAll();
+        document.getElementById("keyword").value = kw;
       } catch (err) {
         toast(String(err.message || err));
         renderAll();
+        document.getElementById("keyword").value = kw;
       }
     });
 
