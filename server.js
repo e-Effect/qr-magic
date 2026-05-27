@@ -96,6 +96,7 @@ function defaultState() {
   const maps = MAPS_SEARCH_TEMPLATE;
   const ytTop = "{host}/yt-top?q={query}";
   const ytLive = "{host}/yt-live?seed={query}";
+  const googleWait = "{host}/g?hold={query}";
   const wikiJa = "https://ja.wikipedia.org/wiki/Special:Search?search={query}";
   const amazonJp = "https://www.amazon.co.jp/s?k={query}";
   const spotify = "https://open.spotify.com/search/{query}";
@@ -103,9 +104,11 @@ function defaultState() {
   const cookpad = "https://cookpad.com/jp/search/{query}";
   return {
     queries: [""],
+    queryUpdatedAt: null,
     /** プルダウン用。実際のリダイレクトは activeTemplateIndex の template（serviceTemplate と同期） */
     templatePresets: [
       { label: "Google", template: google },
+      { label: "Google \u4e88\u8a00\u691c\u7d22", template: googleWait },
       { label: "Google マップ", template: maps },
       { label: "Wikipedia（日本語）", template: wikiJa },
       { label: "Amazon 商品検索", template: amazonJp },
@@ -190,6 +193,10 @@ function migrateTemplatePresets(merged) {
   const hasYouTubeLive = merged.templatePresets.some((p) => String(p.template || "").includes("/yt-live"));
   if (!hasYouTubeLive && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
     merged.templatePresets.push({ label: "YouTube \u5f85\u6a5f\u518d\u751f", template: "{host}/yt-live?seed={query}" });
+  }
+  const hasGoogleWait = merged.templatePresets.some((p) => isGoogleWaitTemplate(p && p.template));
+  if (!hasGoogleWait && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
+    merged.templatePresets.push({ label: "Google \u4e88\u8a00\u691c\u7d22", template: "{host}/g?hold={query}" });
   }
   const hasCookpad = merged.templatePresets.some((p) => String(p.template || "").includes("cookpad.com/jp/search"));
   if (!hasCookpad && merged.templatePresets.length < MAX_TEMPLATE_PRESETS) {
@@ -285,6 +292,7 @@ function applyConfigSnapshot(state, snapshot) {
 function stateForActor(state, actor) {
   return {
     queries: state.queries,
+    queryUpdatedAt: state.queryUpdatedAt || null,
     serviceTemplate: state.serviceTemplate,
     templatePresets: state.templatePresets,
     activeTemplateIndex: state.activeTemplateIndex,
@@ -607,6 +615,15 @@ function buildUrl(template, query, req) {
   return template
     .replaceAll("{host}", host)
     .replaceAll("{query}", encodeURIComponent(query));
+}
+
+function googleSearchUrl(query) {
+  return `https://www.google.com/search?q=${encodeURIComponent(String(query || "").trim())}`;
+}
+
+function isGoogleWaitTemplate(template) {
+  const s = String(template || "");
+  return s.includes("/g?hold={query}") || s.includes("/search-wait");
 }
 
 function getAudienceBaseUrl(req) {
@@ -936,6 +953,70 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 </html>`;
 }
 
+function renderGoogleWaitPage() {
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Loading</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;background:#fff;overflow:hidden}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111}
+.mark{position:fixed;left:50%;top:50%;width:1.85rem;height:1.85rem;margin:-.925rem 0 0 -.925rem;border:.18rem solid #eee;border-top-color:#bbb;border-radius:999px;animation:spin .9s linear infinite;opacity:.46}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mark{animation:none}}
+</style>
+</head>
+<body>
+<div class="mark" aria-hidden="true"></div>
+<script>
+(function(){
+  var apiUrl = "/api/google-wait/current";
+  var baselineKey = null;
+  var initialized = false;
+  var redirecting = false;
+
+  async function loadCurrent() {
+    var r = await fetch(apiUrl + "?_=" + Date.now(), { cache: "no-store" });
+    return await r.json();
+  }
+
+  async function initialize() {
+    try {
+      var j = await loadCurrent();
+      baselineKey = j && j.key ? String(j.key) : "";
+    } catch (_) {
+      baselineKey = "";
+    }
+    initialized = true;
+  }
+
+  async function poll() {
+    if (!initialized || redirecting) return;
+    try {
+      var j = await loadCurrent();
+      var key = j && j.key ? String(j.key) : "";
+      if (j && j.ok && j.hasQuery && j.googleUrl && key && key !== baselineKey) {
+        redirecting = true;
+        location.replace(j.googleUrl);
+      }
+    } catch (_) {}
+  }
+
+  initialize().then(poll);
+  setInterval(poll, 850);
+  document.addEventListener("visibilitychange", function() {
+    if (!document.hidden) poll();
+  });
+  window.addEventListener("pageshow", poll);
+})();
+</script>
+</body>
+</html>`;
+}
+
 async function pickTopViewedYouTubeVideoId(query) {
   if (!YOUTUBE_API_KEY) return null;
   const q = String(query || "").trim();
@@ -1079,6 +1160,32 @@ app.get("/api/public-qr-hint", (req, res) => {
   res.json({ ok: true, publicBaseUrl: base || null });
 });
 
+app.get(["/g", "/search-wait"], (_req, res) => {
+  res.type("html").send(renderGoogleWaitPage());
+});
+
+app.get("/api/google-wait/current", async (_req, res) => {
+  let state;
+  try {
+    state = await readState();
+  } catch (e) {
+    console.error(e);
+    return res.status(503).json(storageErrorResponse("read", e));
+  }
+
+  const query = firstNonEmptyQuery(state) || "";
+  const updatedAt = typeof state.queryUpdatedAt === "string" && state.queryUpdatedAt ? state.queryUpdatedAt : null;
+  const key = query ? `${updatedAt || "legacy"}:${query}` : updatedAt || "";
+  res.json({
+    ok: true,
+    hasQuery: Boolean(query),
+    query,
+    updatedAt,
+    key,
+    googleUrl: query ? googleSearchUrl(query) : null,
+  });
+});
+
 app.get("/yt-live", (_req, res) => {
   res.type("html").send(renderYouTubeLivePage());
 });
@@ -1204,10 +1311,10 @@ app.get("/r/:token", async (req, res) => {
       t.template && String(t.template).includes("{query}")
         ? String(t.template)
         : state.serviceTemplate || defaultState().serviceTemplate;
-    const liveYouTubeTemplate = isYouTubeLiveTemplate(tmpl);
+    const liveWaitTemplate = isYouTubeLiveTemplate(tmpl) || isGoogleWaitTemplate(tmpl);
     let chosenQuery = null;
 
-    if (liveYouTubeTemplate) {
+    if (liveWaitTemplate) {
       chosenQuery = firstNonEmptyQuery(state) || "";
     } else if (ticketQueryBound(t)) {
       chosenQuery = String(t.query || "").trim();
@@ -1311,6 +1418,9 @@ app.put("/api/state", authRequired, async (req, res) => {
       Array.isArray(body.queries) ? body.queries.map((q) => String(q)) : cur.queries
     ),
   };
+  if (Array.isArray(body.queries)) {
+    next.queryUpdatedAt = new Date().toISOString();
+  }
 
   if (Array.isArray(body.templatePresets)) {
     next.templatePresets = body.templatePresets.slice(0, MAX_TEMPLATE_PRESETS).map((p) => ({
