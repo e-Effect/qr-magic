@@ -123,9 +123,7 @@ function defaultState() {
      */
     /** 名刺用キーワード: frozen=初回で固定 / recycle=常に管理画面のキーワードに追従 */
     ticketKeywordMode: "frozen",
-    showPresets: [],
     undoStack: [],
-    productionLock: false,
     tickets: {},
     /** 簡易アクセス履歴（最新が後ろ） */
     scanEvents: [],
@@ -140,7 +138,6 @@ function defaultState() {
 
 const MAX_TEMPLATE_PRESETS = 20;
 const MAX_SCAN_EVENTS = 1000;
-const MAX_SHOW_PRESETS = 20;
 const MAX_UNDO_STACK = 10;
 
 function syncTemplatesFromPresets(state) {
@@ -206,34 +203,6 @@ function normalizeTicketKeywordMode(s) {
   s.ticketKeywordMode = s.ticketKeywordMode === "recycle" ? "recycle" : "frozen";
 }
 
-function normalizeShowPresetsList(value) {
-  const raw = Array.isArray(value) ? value : [];
-  const out = [];
-  for (const p of raw) {
-    if (!p || typeof p !== "object") continue;
-    const label = String(p.label || "").trim().slice(0, 60) || `演目 ${out.length + 1}`;
-    const query = String(p.query || "").trim().slice(0, 120);
-    const template = String(p.template || "").trim();
-    if (template && !template.includes("{query}")) continue;
-    const templateLabel = String(p.templateLabel || "").trim().slice(0, 60);
-    const createdAt = typeof p.createdAt === "string" && p.createdAt ? p.createdAt : new Date().toISOString();
-    out.push({
-      label,
-      query,
-      template,
-      templateLabel,
-      ticketKeywordMode: p.ticketKeywordMode === "recycle" ? "recycle" : "frozen",
-      createdAt,
-    });
-    if (out.length >= MAX_SHOW_PRESETS) break;
-  }
-  return out;
-}
-
-function normalizeShowPresetsOnRead(merged) {
-  merged.showPresets = normalizeShowPresetsList(merged.showPresets);
-}
-
 function configSnapshot(state) {
   const snap = {
     queries: normalizeQueriesToSingle(state && state.queries),
@@ -269,10 +238,6 @@ function normalizeUndoStackOnRead(merged) {
   merged.undoStack = raw.map(normalizeUndoSnapshot).filter(Boolean).slice(-MAX_UNDO_STACK);
 }
 
-function normalizeProductionLockOnRead(merged) {
-  merged.productionLock = merged.productionLock === true;
-}
-
 function comparableSnapshot(snap) {
   return JSON.stringify({
     queries: snap.queries,
@@ -306,14 +271,6 @@ function applyConfigSnapshot(state, snapshot) {
   return true;
 }
 
-function isProductionLocked(state) {
-  return state && state.productionLock === true;
-}
-
-function lockedResponse(res) {
-  return res.status(423).json({ ok: false, code: "PRODUCTION_LOCKED", message: "本番ロック中です。解除してから操作してください。" });
-}
-
 function stateForActor(state, actor) {
   return {
     queries: state.queries,
@@ -322,9 +279,7 @@ function stateForActor(state, actor) {
     activeTemplateIndex: state.activeTemplateIndex,
     ticketKeywordMode: state.ticketKeywordMode,
     ticketCount: countOwnedTickets(state, actor),
-    showPresets: Array.isArray(state.showPresets) ? state.showPresets : [],
     undoAvailable: Array.isArray(state.undoStack) && state.undoStack.length > 0,
-    productionLock: state.productionLock === true,
   };
 }
 
@@ -443,9 +398,7 @@ function hydrateMergedState(parsed) {
   normalizeSessionsOnRead(merged);
   migrateTemplatePresets(merged);
   normalizeTicketKeywordMode(merged);
-  normalizeShowPresetsOnRead(merged);
   normalizeUndoStackOnRead(merged);
-  normalizeProductionLockOnRead(merged);
   return merged;
 }
 
@@ -1053,15 +1006,7 @@ app.put("/api/state", authRequired, async (req, res) => {
     next.ticketKeywordMode = cur.ticketKeywordMode === "recycle" ? "recycle" : "frozen";
   }
   normalizeTicketKeywordMode(next);
-  if (Array.isArray(body.showPresets)) {
-    next.showPresets = normalizeShowPresetsList(body.showPresets);
-  }
-  if (typeof body.productionLock === "boolean") {
-    next.productionLock = body.productionLock;
-  }
-  normalizeShowPresetsOnRead(next);
   normalizeUndoStackOnRead(next);
-  normalizeProductionLockOnRead(next);
   pushUndoSnapshot(next, cur);
 
   try {
@@ -1138,7 +1083,6 @@ app.post("/api/admin/codes/bulk", authRequired, adminOnly, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
-  if (isProductionLocked(state)) return lockedResponse(res);
   if (!state.loginCodes || typeof state.loginCodes !== "object") state.loginCodes = {};
   const created = [];
   for (let i = 0; i < count; i++) {
@@ -1173,7 +1117,6 @@ app.post("/api/admin/codes/revoke", authRequired, adminOnly, async (req, res) =>
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
-  if (isProductionLocked(state)) return lockedResponse(res);
   if (!state.loginCodes || !state.loginCodes[id]) {
     return res.status(404).json({ ok: false, message: "IDが見つかりません" });
   }
@@ -1340,7 +1283,6 @@ app.post("/api/tickets/bulk", authRequired, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
-  if (isProductionLocked(cur)) return lockedResponse(res);
   if (!cur.tickets || typeof cur.tickets !== "object") cur.tickets = {};
   const created = [];
   for (let i = 0; i < count; i++) {
@@ -1384,7 +1326,6 @@ app.post("/api/tickets/clear", authRequired, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
-  if (isProductionLocked(cur)) return lockedResponse(res);
   if (isAdminActor(req.auth)) {
     cur.tickets = {};
     cur.scanEvents = [];
