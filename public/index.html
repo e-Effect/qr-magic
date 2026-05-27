@@ -5,12 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>QR Magic（個人用）</title>
   <style>
-<<<<<<< HEAD
-    :root { font-family: system-ui, sans-serif; color: #111; background: #f4f4f5; }
-    body { margin: 0 auto; max-width: 520px; padding: 1rem 1rem 3rem; }
-    h1 { font-size: 1.15rem; margin: 0 0 0.75rem; }
-    h2 { font-size: 0.95rem; margin: 0 0 0.5rem; }
-=======
     :root {
       color-scheme: dark;
       font-family: Inter, "SF Pro Display", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
@@ -43,7 +37,6 @@
     }
     h1 { font-size: 1.5rem; line-height: 1.05; margin: 0; letter-spacing: 0; }
     h2 { font-size: 0.78rem; margin: 0 0 0.7rem; color: var(--muted); letter-spacing: 0; font-weight: 700; text-transform: uppercase; }
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     h3 { font-size: 0.9rem; margin: 0; }
     input[type="text"], input[type="password"], textarea, select {
       width: 100%;
@@ -69,7 +62,6 @@
       color: var(--text);
       outline: none;
     }
-    input[type="number"] { box-sizing: border-box; padding: 0.45rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
     textarea { min-height: 2.5rem; resize: vertical; }
     button {
       cursor: pointer;
@@ -127,16 +119,6 @@
       color: var(--soft);
       margin: 0 0 0.15rem;
     }
-<<<<<<< HEAD
-    button:disabled { opacity: 0.52; cursor: not-allowed; }
-    .btn-primary { background: #2563eb; color: #fff; }
-    .btn-secondary { background: #e4e4e7; color: #18181b; }
-    .btn-danger { background: #dc2626; color: #fff; }
-    .panel { background: #fff; border-radius: 10px; padding: 0.85rem; border: 1px solid #e4e4e7; margin-top: 0.75rem; }
-    .muted { color: #71717a; font-size: 0.85rem; word-break: break-all; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; align-items: center; }
-=======
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     .settingsFab {
       position: fixed;
       top: 0.75rem;
@@ -171,11 +153,7 @@
       top: 0;
       right: 0;
       bottom: 0;
-<<<<<<< HEAD
-      width: min(100vw, 24rem);
-=======
       width: min(100vw, 25rem);
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
       z-index: 100;
       background: #141413;
       border-left: 1px solid var(--line);
@@ -196,11 +174,7 @@
     .settingsDrawerHead h2 { font-size: 0.95rem; margin: 0; }
     .settingsDrawerBody { padding: 0.75rem 0.85rem 1.25rem; overflow: auto; flex: 1; }
     .settingsDrawerBody textarea { font-size: 0.72rem; font-family: ui-monospace, monospace; min-height: 9rem; }
-<<<<<<< HEAD
-    .settingsSection { border: 1px solid #e4e4e7; border-radius: 8px; background: #fff; margin-bottom: 0.55rem; overflow: hidden; }
-=======
     .settingsSection { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin-bottom: 0.55rem; overflow: hidden; }
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
     .settingsSection summary {
       cursor: pointer;
       list-style: none;
@@ -212,18 +186,6 @@
       align-items: center;
     }
     .settingsSection summary::-webkit-details-marker { display: none; }
-<<<<<<< HEAD
-    .settingsSection summary::after { content: "開く"; color: #71717a; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
-    .settingsSection[open] summary { border-bottom: 1px solid #e4e4e7; }
-    .settingsSection[open] summary::after { content: "閉じる"; }
-    .settingsSectionBody { padding: 0.75rem; }
-    .qrStateList { display: grid; gap: 0.4rem; max-height: 18rem; overflow: auto; margin-top: 0.55rem; }
-    .qrStateRow { border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.55rem; background: #fafafa; }
-    .qrStateTop { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.18rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #e4e4e7; color: #18181b; white-space: nowrap; }
-    .badge--fixed { background: #dbeafe; color: #1d4ed8; }
-    .badge--hit { background: #dcfce7; color: #166534; }
-=======
     .settingsSection summary::after { content: "開く"; color: var(--primary); font-size: 0.76rem; font-weight: 800; white-space: nowrap; }
     .settingsSection[open] summary { border-bottom: 1px solid var(--line); background: rgba(246,240,232,.035); }
     .settingsSection[open] summary::after { content: "閉じる"; }
@@ -243,7 +205,6 @@
     @media (min-width: 720px) {
       body { padding-top: 1.6rem; }
     }
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
   </style>
 </head>
 <body>
@@ -343,10 +304,6 @@
     </div>
   </div>
 
-<<<<<<< HEAD
-  <p id="appVersionBar" class="muted" style="font-size:0.82rem;margin:0 0 0.5rem">バージョン …</p>
-  <h1>QR Magic（個人用）</h1>
-=======
   <header class="brandHeader">
     <div>
       <div class="brandMark">QR</div>
@@ -355,7 +312,6 @@
     </div>
     <p id="appVersionBar" class="versionPill">バージョン …</p>
   </header>
->>>>>>> 2956223 (deploy 2026-05-27 22:52)
 
   <div id="gate" class="panel">
     <h2>ログインID</h2>
