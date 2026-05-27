@@ -123,6 +123,9 @@ function defaultState() {
      */
     /** 名刺用キーワード: frozen=初回で固定 / recycle=常に管理画面のキーワードに追従 */
     ticketKeywordMode: "frozen",
+    showPresets: [],
+    undoStack: [],
+    productionLock: false,
     tickets: {},
     /** 簡易アクセス履歴（最新が後ろ） */
     scanEvents: [],
@@ -137,6 +140,8 @@ function defaultState() {
 
 const MAX_TEMPLATE_PRESETS = 20;
 const MAX_SCAN_EVENTS = 1000;
+const MAX_SHOW_PRESETS = 20;
+const MAX_UNDO_STACK = 10;
 
 function syncTemplatesFromPresets(state) {
   const presets = Array.isArray(state.templatePresets) ? state.templatePresets : [];
@@ -199,6 +204,128 @@ function migrateTemplatePresets(merged) {
 
 function normalizeTicketKeywordMode(s) {
   s.ticketKeywordMode = s.ticketKeywordMode === "recycle" ? "recycle" : "frozen";
+}
+
+function normalizeShowPresetsList(value) {
+  const raw = Array.isArray(value) ? value : [];
+  const out = [];
+  for (const p of raw) {
+    if (!p || typeof p !== "object") continue;
+    const label = String(p.label || "").trim().slice(0, 60) || `演目 ${out.length + 1}`;
+    const query = String(p.query || "").trim().slice(0, 120);
+    const template = String(p.template || "").trim();
+    if (template && !template.includes("{query}")) continue;
+    const templateLabel = String(p.templateLabel || "").trim().slice(0, 60);
+    const createdAt = typeof p.createdAt === "string" && p.createdAt ? p.createdAt : new Date().toISOString();
+    out.push({
+      label,
+      query,
+      template,
+      templateLabel,
+      ticketKeywordMode: p.ticketKeywordMode === "recycle" ? "recycle" : "frozen",
+      createdAt,
+    });
+    if (out.length >= MAX_SHOW_PRESETS) break;
+  }
+  return out;
+}
+
+function normalizeShowPresetsOnRead(merged) {
+  merged.showPresets = normalizeShowPresetsList(merged.showPresets);
+}
+
+function configSnapshot(state) {
+  const snap = {
+    queries: normalizeQueriesToSingle(state && state.queries),
+    templatePresets: Array.isArray(state && state.templatePresets)
+      ? state.templatePresets.slice(0, MAX_TEMPLATE_PRESETS).map((p) => ({
+          label: String((p && p.label) || "").trim().slice(0, 60),
+          template: String((p && p.template) || "").trim(),
+        }))
+      : [],
+    activeTemplateIndex: parseInt(state && state.activeTemplateIndex, 10),
+    ticketKeywordMode: state && state.ticketKeywordMode === "recycle" ? "recycle" : "frozen",
+  };
+  syncTemplatesFromPresets(snap);
+  return {
+    queries: snap.queries,
+    templatePresets: snap.templatePresets,
+    activeTemplateIndex: snap.activeTemplateIndex,
+    ticketKeywordMode: snap.ticketKeywordMode,
+  };
+}
+
+function normalizeUndoSnapshot(value) {
+  if (!value || typeof value !== "object") return null;
+  const snap = {
+    ...configSnapshot(value),
+    createdAt: typeof value.createdAt === "string" && value.createdAt ? value.createdAt : new Date().toISOString(),
+  };
+  return snap;
+}
+
+function normalizeUndoStackOnRead(merged) {
+  const raw = Array.isArray(merged.undoStack) ? merged.undoStack : [];
+  merged.undoStack = raw.map(normalizeUndoSnapshot).filter(Boolean).slice(-MAX_UNDO_STACK);
+}
+
+function normalizeProductionLockOnRead(merged) {
+  merged.productionLock = merged.productionLock === true;
+}
+
+function comparableSnapshot(snap) {
+  return JSON.stringify({
+    queries: snap.queries,
+    templatePresets: snap.templatePresets,
+    activeTemplateIndex: snap.activeTemplateIndex,
+    ticketKeywordMode: snap.ticketKeywordMode,
+  });
+}
+
+function snapshotsEqual(a, b) {
+  return comparableSnapshot(a) === comparableSnapshot(b);
+}
+
+function pushUndoSnapshot(next, cur) {
+  const before = configSnapshot(cur);
+  const after = configSnapshot(next);
+  if (snapshotsEqual(before, after)) return;
+  const stack = Array.isArray(cur.undoStack) ? cur.undoStack.map(normalizeUndoSnapshot).filter(Boolean) : [];
+  next.undoStack = [...stack, { ...before, createdAt: new Date().toISOString() }].slice(-MAX_UNDO_STACK);
+}
+
+function applyConfigSnapshot(state, snapshot) {
+  const snap = normalizeUndoSnapshot(snapshot);
+  if (!snap) return false;
+  state.queries = snap.queries;
+  state.templatePresets = snap.templatePresets;
+  state.activeTemplateIndex = snap.activeTemplateIndex;
+  state.ticketKeywordMode = snap.ticketKeywordMode;
+  syncTemplatesFromPresets(state);
+  normalizeTicketKeywordMode(state);
+  return true;
+}
+
+function isProductionLocked(state) {
+  return state && state.productionLock === true;
+}
+
+function lockedResponse(res) {
+  return res.status(423).json({ ok: false, code: "PRODUCTION_LOCKED", message: "本番ロック中です。解除してから操作してください。" });
+}
+
+function stateForActor(state, actor) {
+  return {
+    queries: state.queries,
+    serviceTemplate: state.serviceTemplate,
+    templatePresets: state.templatePresets,
+    activeTemplateIndex: state.activeTemplateIndex,
+    ticketKeywordMode: state.ticketKeywordMode,
+    ticketCount: countOwnedTickets(state, actor),
+    showPresets: Array.isArray(state.showPresets) ? state.showPresets : [],
+    undoAvailable: Array.isArray(state.undoStack) && state.undoStack.length > 0,
+    productionLock: state.productionLock === true,
+  };
 }
 
 function normalizeLoginCodesOnRead(merged) {
@@ -316,6 +443,9 @@ function hydrateMergedState(parsed) {
   normalizeSessionsOnRead(merged);
   migrateTemplatePresets(merged);
   normalizeTicketKeywordMode(merged);
+  normalizeShowPresetsOnRead(merged);
+  normalizeUndoStackOnRead(merged);
+  normalizeProductionLockOnRead(merged);
   return merged;
 }
 
@@ -339,8 +469,11 @@ async function readStateFromSupabase() {
   const sb = getSupabase();
   const { data, error } = await sb.from(QR_MAGIC_STATE_TABLE).select("data").eq("id", 1).maybeSingle();
   if (error) {
-    console.error("[qr-magic] Supabase readState:", error.message);
-    return hydrateMergedState({});
+    console.error("[qr-magic] Supabase readState:", storageErrorDetail(error));
+    const e = new Error("Supabase readState failed");
+    e.code = "SUPABASE_READ_FAILED";
+    e.cause = error;
+    throw e;
   }
   if (data && data.data != null && typeof data.data === "object") {
     return hydrateMergedState(data.data);
@@ -352,7 +485,13 @@ async function readStateFromSupabase() {
       const merged = hydrateMergedState(parsed);
       await writeStateToSupabase(merged);
       return merged;
-    } catch (_) {}
+    } catch (e) {
+      console.error("[qr-magic] Supabase seedState:", storageErrorDetail(e));
+      const err = new Error("Supabase seedState failed");
+      err.code = "SUPABASE_SEED_FAILED";
+      err.cause = e;
+      throw err;
+    }
   }
   return hydrateMergedState({});
 }
@@ -401,8 +540,11 @@ async function writeStateToSupabase(state) {
   };
   const { error } = await sb.from(QR_MAGIC_STATE_TABLE).upsert(row, { onConflict: "id" });
   if (error) {
-    console.error("[qr-magic] Supabase writeState:", error.message);
-    throw error;
+    console.error("[qr-magic] Supabase writeState:", storageErrorDetail(error));
+    const e = new Error("Supabase writeState failed");
+    e.code = "SUPABASE_WRITE_FAILED";
+    e.cause = error;
+    throw e;
   }
 }
 
@@ -427,6 +569,27 @@ function bearerToken(req) {
 
 function isAdminActor(actor) {
   return actor && actor.role === "admin";
+}
+
+function storageErrorDetail(err) {
+  const parts = [];
+  let cur = err;
+  while (cur) {
+    if (cur.code) parts.push(`code=${cur.code}`);
+    if (cur.message) parts.push(cur.message);
+    cur = cur.cause;
+  }
+  return parts.join(" | ") || String(err || "unknown storage error");
+}
+
+function storageErrorResponse(action, err) {
+  return {
+    ok: false,
+    code: "SUPABASE_STORAGE_ERROR",
+    action,
+    message: "保存先(Supabase)に接続できません。SUPABASE_URL と service_role/secret key を確認してください。",
+    detail: storageErrorDetail(err),
+  };
 }
 
 function issueSessionToken() {
@@ -466,7 +629,7 @@ function authRequired(req, res, next) {
     })
     .catch((e) => {
       console.error(e);
-      res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
+      res.status(503).json(storageErrorResponse("read", e));
     });
 }
 
@@ -629,6 +792,25 @@ app.get("/api/version", (_req, res) => {
   res.json({ ok: true, version: getAppVersion() });
 });
 
+app.get("/api/storage-health", async (_req, res) => {
+  if (!getSupabase()) {
+    return res.json({ ok: true, storage: "file", message: "local file storage" });
+  }
+  try {
+    const state = await readStateFromSupabase();
+    return res.json({
+      ok: true,
+      storage: "supabase",
+      tickets: state.tickets ? Object.keys(state.tickets).length : 0,
+      loginCodes: state.loginCodes ? Object.keys(state.loginCodes).length : 0,
+      scanEvents: Array.isArray(state.scanEvents) ? state.scanEvents.length : 0,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(503).json(storageErrorResponse("read", e));
+  }
+});
+
 /** トンネル等で観客用オリジンが決まったら管理画面がポーリングする（URL表示は廃止済み） */
 app.get("/api/public-qr-hint", (req, res) => {
   const base = getPublicBaseUrl();
@@ -661,7 +843,7 @@ app.post("/api/login", async (req, res) => {
     state = await readState();
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
+    return res.status(503).json(storageErrorResponse("read", e));
   }
   const code = state.loginCodes && state.loginCodes[id];
   if (!code || code.active === false) {
@@ -684,7 +866,7 @@ app.post("/api/login", async (req, res) => {
     await writeState(state);
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ ok: false, message: "ログイン保存に失敗しました" });
+    return res.status(503).json(storageErrorResponse("write", e));
   }
   return res.json({
     ok: true,
@@ -813,14 +995,7 @@ app.get("/api/state", authRequired, async (req, res) => {
     ok: true,
     publicBaseUrl: getPublicBaseUrl() || null,
     actor: req.auth,
-    state: {
-      queries: state.queries,
-      serviceTemplate: state.serviceTemplate,
-      templatePresets: state.templatePresets,
-      activeTemplateIndex: state.activeTemplateIndex,
-      ticketKeywordMode: state.ticketKeywordMode,
-      ticketCount: countOwnedTickets(state, req.auth),
-    },
+    state: stateForActor(state, req.auth),
   });
 });
 
@@ -878,6 +1053,16 @@ app.put("/api/state", authRequired, async (req, res) => {
     next.ticketKeywordMode = cur.ticketKeywordMode === "recycle" ? "recycle" : "frozen";
   }
   normalizeTicketKeywordMode(next);
+  if (Array.isArray(body.showPresets)) {
+    next.showPresets = normalizeShowPresetsList(body.showPresets);
+  }
+  if (typeof body.productionLock === "boolean") {
+    next.productionLock = body.productionLock;
+  }
+  normalizeShowPresetsOnRead(next);
+  normalizeUndoStackOnRead(next);
+  normalizeProductionLockOnRead(next);
+  pushUndoSnapshot(next, cur);
 
   try {
     await writeState(next);
@@ -887,7 +1072,36 @@ app.put("/api/state", authRequired, async (req, res) => {
   }
   res.json({
     ok: true,
-    state: { ...next, ticketCount: countOwnedTickets(next, req.auth) },
+    state: stateForActor(next, req.auth),
+  });
+});
+
+app.post("/api/state/undo", authRequired, async (req, res) => {
+  let cur;
+  try {
+    cur = await readState();
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
+  }
+  const stack = Array.isArray(cur.undoStack) ? cur.undoStack.map(normalizeUndoSnapshot).filter(Boolean) : [];
+  const snapshot = stack.pop();
+  if (!snapshot) {
+    return res.status(400).json({ ok: false, message: "戻せる設定がありません" });
+  }
+  const next = { ...cur, undoStack: stack.slice(-MAX_UNDO_STACK) };
+  if (!applyConfigSnapshot(next, snapshot)) {
+    return res.status(400).json({ ok: false, message: "戻せる設定がありません" });
+  }
+  try {
+    await writeState(next);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, message: "保存に失敗しました" });
+  }
+  res.json({
+    ok: true,
+    state: stateForActor(next, req.auth),
   });
 });
 
@@ -924,6 +1138,7 @@ app.post("/api/admin/codes/bulk", authRequired, adminOnly, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
+  if (isProductionLocked(state)) return lockedResponse(res);
   if (!state.loginCodes || typeof state.loginCodes !== "object") state.loginCodes = {};
   const created = [];
   for (let i = 0; i < count; i++) {
@@ -958,6 +1173,7 @@ app.post("/api/admin/codes/revoke", authRequired, adminOnly, async (req, res) =>
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
+  if (isProductionLocked(state)) return lockedResponse(res);
   if (!state.loginCodes || !state.loginCodes[id]) {
     return res.status(404).json({ ok: false, message: "IDが見つかりません" });
   }
@@ -1124,6 +1340,7 @@ app.post("/api/tickets/bulk", authRequired, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
+  if (isProductionLocked(cur)) return lockedResponse(res);
   if (!cur.tickets || typeof cur.tickets !== "object") cur.tickets = {};
   const created = [];
   for (let i = 0; i < count; i++) {
@@ -1167,6 +1384,7 @@ app.post("/api/tickets/clear", authRequired, async (req, res) => {
     console.error(e);
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
+  if (isProductionLocked(cur)) return lockedResponse(res);
   if (isAdminActor(req.auth)) {
     cur.tickets = {};
     cur.scanEvents = [];
