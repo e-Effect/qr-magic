@@ -1427,13 +1427,9 @@ app.put("/api/state", authRequired, async (req, res) => {
     return res.status(500).json({ ok: false, message: "状態の読み込みに失敗しました" });
   }
   const body = req.body || {};
-  const hasTemplateFields =
-    Array.isArray(body.templatePresets) ||
-    body.activeTemplateIndex !== undefined ||
-    body.serviceTemplate !== undefined;
   const shouldCommitQuery =
     Array.isArray(body.queries) &&
-    (body.commitQuery === true || (body.commitQuery !== false && !hasTemplateFields));
+    body.commitQuery !== false;
   const next = {
     ...cur,
     queries: normalizeQueriesToSingle(
@@ -1848,8 +1844,10 @@ function loadAdminIndexHtml() {
 app.get("/", (_req, res) => {
   const html = loadAdminIndexHtml();
   if (html) {
+    res.set("Cache-Control", "no-store");
     return res.type("html").send(html);
   }
+  res.set("Cache-Control", "no-store");
   return res.status(200).type("html").send(`<!DOCTYPE html><html lang="ja"><meta charset="utf-8">
 <title>エラー</title><body style="font-family:sans-serif;padding:1.5rem">
 <p>管理画面を読み込めません。<code>embedded-index.html</code> または <code>embedded-index.js</code> をリポジトリの<strong>一番上のフォルダ</strong>に置いてください。</p>
