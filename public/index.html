@@ -198,6 +198,10 @@
     .badge--hit { background: rgba(215,181,109,.18); color: #f2d68e; }
     #app { display: grid; gap: 0; }
     #keyword { font-size: 1.28rem; font-weight: 800; padding: 0.9rem 0.95rem; }
+    .injectUrlPanel { margin-top: 0.2rem; }
+    .copyRow { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: center; }
+    .copyRow input { font-size: 0.92rem; font-weight: 700; }
+    .copyRow button { padding: 0.72rem 0.82rem; white-space: nowrap; }
     #toast {
       border: 1px solid var(--line-strong);
       box-shadow: var(--shadow);
@@ -313,6 +317,14 @@
     <p id="appVersionBar" class="versionPill">バージョン …</p>
   </header>
 
+  <div class="panel injectUrlPanel">
+    <h2>インジェクトモードURL</h2>
+    <div class="copyRow">
+      <input type="text" id="injectModeUrl" readonly value="https://qr-magic-tk7m.onrender.com/g" aria-label="インジェクトモードURL" />
+      <button type="button" class="btn-secondary" id="btnCopyInjectUrl">コピー</button>
+    </div>
+  </div>
+
   <div id="gate" class="panel">
     <h2>ログインID</h2>
     <p class="muted">8桁の数字IDを入力してください。</p>
@@ -341,7 +353,7 @@
       <h2>キーワード</h2>
       <input type="text" id="keyword" placeholder="例: りんご" autocomplete="off" />
       <div class="toolbar">
-        <button type="button" class="btn-primary" id="saveBtn">保存</button>
+        <button type="button" class="btn-primary" id="saveBtn">送信</button>
         <button type="button" class="btn-secondary" id="btnPreviewKeyword">プレビュー</button>
       </div>
     </div>
@@ -386,6 +398,26 @@
 
     function audienceOrigin() {
       return (publicBaseUrl && publicBaseUrl.length > 0 ? publicBaseUrl : location.origin).replace(/\/+$/, "");
+    }
+
+    function injectModeUrl() {
+      return audienceOrigin() + "/g";
+    }
+
+    function renderInjectModeUrl() {
+      const input = document.getElementById("injectModeUrl");
+      if (input) input.value = injectModeUrl();
+    }
+
+    async function copyTextFromInput(input) {
+      const value = input.value;
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        input.focus();
+        input.select();
+        document.execCommand("copy");
+      }
     }
 
     function setSettingsFabVisible(on) {
@@ -675,6 +707,7 @@
     function renderAll(opts = {}) {
       ensurePresets();
       renderTemplateBlock();
+      renderInjectModeUrl();
       syncKeywordFromState({ clear: !!opts.clearKeyword });
       renderTicketModeUi();
       renderSettingsSummaries();
@@ -720,7 +753,7 @@
     async function save() {
       try {
         await saveKeywordAndTemplateSelection();
-        toast("保存しました");
+        toast("送信しました");
         renderAll();
       } catch (e) {
         toast(String(e.message || e));
@@ -829,6 +862,14 @@
     };
 
     document.getElementById("saveBtn").onclick = () => save();
+    document.getElementById("btnCopyInjectUrl").onclick = async () => {
+      try {
+        await copyTextFromInput(document.getElementById("injectModeUrl"));
+        toast("コピーしました");
+      } catch (e) {
+        toast("コピーできませんでした");
+      }
+    };
 
     async function setTicketKeywordMode(mode) {
       try {
@@ -918,6 +959,7 @@
       }
     }
 
+    renderInjectModeUrl();
     if (sessionToken) startApp();
 
     (function loadAppVersion() {
