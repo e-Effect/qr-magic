@@ -522,16 +522,31 @@ async function writeStateToSupabase(state) {
 }
 
 async function readState() {
-  if (getSupabase()) return readStateFromSupabase();
+  if (getSupabase()) {
+    try {
+      return await readStateFromSupabase();
+    } catch (e) {
+      console.error("[qr-magic] Supabase read failed; using local file fallback:", storageErrorDetail(e));
+      return readStateFromFileSync();
+    }
+  }
   return readStateFromFileSync();
 }
 
 async function writeState(state) {
   if (getSupabase()) {
-    await writeStateToSupabase(state);
+    try {
+      await writeStateToSupabase(state);
+      return;
+    } catch (e) {
+      console.error("[qr-magic] Supabase write failed; using local file fallback:", storageErrorDetail(e));
+      writeStateToFileSync(state);
+      return;
+    }
+  } else {
+    writeStateToFileSync(state);
     return;
   }
-  writeStateToFileSync(state);
 }
 
 function bearerToken(req) {
