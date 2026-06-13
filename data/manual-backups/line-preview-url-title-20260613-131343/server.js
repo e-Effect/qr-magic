@@ -770,20 +770,19 @@ function isLinkPreviewRequest(req) {
 
 function sendNeutralLinkPreview(req, res) {
   const url = `${req.protocol}://${req.get("host")}${req.originalUrl || req.url || ""}`;
-  const title = escapeHtml(url);
   res.set("Cache-Control", "no-store, max-age=0");
   res.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
   return res.status(200).type("html").send(`<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta property="og:type" content="website">
-<meta property="og:title" content="${title}">
+<meta property="og:title" content="QR">
 <meta property="og:description" content="">
 <meta property="og:url" content="${escapeHtml(url)}">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="${title}">
+<meta name="twitter:title" content="QR">
 <meta name="twitter:description" content="">
-<title>${title}</title></head>
+<title>QR</title></head>
 <body></body></html>`);
 }
 
