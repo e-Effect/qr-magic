@@ -37,9 +37,6 @@ const SUPABASE_SERVICE_ROLE_KEY = (
   ""
 ).trim();
 const QR_MAGIC_STATE_TABLE = "qr_magic_app_state";
-const UPSTASH_REDIS_REST_URL = (process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/\/+$/, "");
-const UPSTASH_REDIS_REST_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
-const UPSTASH_STATE_KEY = (process.env.UPSTASH_STATE_KEY || "qr-magic:app-state").trim() || "qr-magic:app-state";
 
 let supabaseClient = null;
 function getSupabase() {
@@ -51,15 +48,6 @@ function getSupabase() {
     });
   }
   return supabaseClient;
-}
-
-function getUpstash() {
-  if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) return null;
-  return {
-    url: UPSTASH_REDIS_REST_URL,
-    token: UPSTASH_REDIS_REST_TOKEN,
-    key: UPSTASH_STATE_KEY,
-  };
 }
 
 const PORT = Number(process.env.PORT || 3333);
@@ -482,72 +470,6 @@ async function readStateFromSupabase() {
 }
 
 /** 旧「パフォーマンス／永続化」用フィールド。もう使わないので保存時に落とす */
-async function upstashCommand(command) {
-  const us = getUpstash();
-  if (!us) {
-    const e = new Error("Upstash is not configured");
-    e.code = "UPSTASH_NOT_CONFIGURED";
-    throw e;
-  }
-  const response = await fetch(us.url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${us.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(command),
-  });
-  const text = await response.text();
-  let payload = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch (_) {}
-  if (!response.ok || (payload && payload.error)) {
-    const msg = (payload && payload.error) || text || response.statusText || `HTTP ${response.status}`;
-    const e = new Error(`Upstash command failed: ${msg}`);
-    e.code = "UPSTASH_REQUEST_FAILED";
-    e.status = response.status;
-    throw e;
-  }
-  return payload ? payload.result : null;
-}
-
-async function readSeedStateForUpstash() {
-  if (getSupabase()) {
-    try {
-      return { source: "supabase", state: await readStateFromSupabase() };
-    } catch (e) {
-      console.error("[qr-magic] Supabase seed for Upstash failed; trying local file:", storageErrorDetail(e));
-    }
-  }
-  const hadFile = fs.existsSync(STATE_FILE);
-  return { source: hadFile ? "file" : "default", state: readStateFromFileSync() };
-}
-
-async function readStateFromUpstash() {
-  const raw = await upstashCommand(["GET", UPSTASH_STATE_KEY]);
-  if (raw != null && raw !== "") {
-    let parsed = raw;
-    if (typeof raw === "string") {
-      try {
-        parsed = JSON.parse(raw);
-      } catch (e) {
-        console.error("[qr-magic] Upstash state parse:", storageErrorDetail(e));
-        const err = new Error("Upstash state JSON parse failed");
-        err.code = "UPSTASH_PARSE_FAILED";
-        err.cause = e;
-        throw err;
-      }
-    }
-    if (parsed && typeof parsed === "object") return hydrateMergedState(parsed);
-  }
-
-  const seeded = await readSeedStateForUpstash();
-  await writeStateToUpstash(seeded.state);
-  console.log(`[qr-magic] Upstash state initialized from ${seeded.source}.`);
-  return seeded.state;
-}
-
 function stripLegacyPerformanceFlags(s) {
   if (!s || typeof s !== "object") return;
   delete s.counter;
@@ -599,19 +521,7 @@ async function writeStateToSupabase(state) {
   }
 }
 
-async function writeStateToUpstash(state) {
-  stripLegacyPerformanceFlags(state);
-  await upstashCommand(["SET", UPSTASH_STATE_KEY, JSON.stringify(state)]);
-}
-
 async function readState() {
-  if (getUpstash()) {
-    try {
-      return await readStateFromUpstash();
-    } catch (e) {
-      console.error("[qr-magic] Upstash read failed; trying fallback storage:", storageErrorDetail(e));
-    }
-  }
   if (getSupabase()) {
     try {
       return await readStateFromSupabase();
@@ -624,14 +534,6 @@ async function readState() {
 }
 
 async function writeState(state) {
-  if (getUpstash()) {
-    try {
-      await writeStateToUpstash(state);
-      return;
-    } catch (e) {
-      console.error("[qr-magic] Upstash write failed; trying fallback storage:", storageErrorDetail(e));
-    }
-  }
   if (getSupabase()) {
     try {
       await writeStateToSupabase(state);
@@ -668,26 +570,12 @@ function storageErrorDetail(err) {
   return parts.join(" | ") || String(err || "unknown storage error");
 }
 
-function primaryStorageName() {
-  if (getUpstash()) return "Upstash";
-  if (getSupabase()) return "Supabase";
-  return "local file";
-}
-
-function storageErrorResponse(action, err, storageName) {
-  const name = storageName || primaryStorageName();
-  const codePrefix = name === "Upstash" ? "UPSTASH" : name === "Supabase" ? "SUPABASE" : "FILE";
-  const message =
-    name === "Upstash"
-      ? "保存先(Upstash)に接続できません。UPSTASH_REDIS_REST_URL と UPSTASH_REDIS_REST_TOKEN を確認してください。"
-      : name === "Supabase"
-        ? "保存先(Supabase)に接続できません。SUPABASE_URL と service_role/secret key を確認してください。"
-        : "保存先(ローカルファイル)に接続できません。data/state.json の書き込み権限を確認してください。";
+function storageErrorResponse(action, err) {
   return {
     ok: false,
-    code: `${codePrefix}_STORAGE_ERROR`,
+    code: "SUPABASE_STORAGE_ERROR",
     action,
-    message,
+    message: "保存先(Supabase)に接続できません。SUPABASE_URL と service_role/secret key を確認してください。",
     detail: storageErrorDetail(err),
   };
 }
@@ -1276,23 +1164,9 @@ app.get("/api/version", (_req, res) => {
 });
 
 app.get("/api/storage-health", async (_req, res) => {
-  if (getUpstash()) {
-    try {
-      const state = await readStateFromUpstash();
-      return res.json({
-        ok: true,
-        storage: "upstash",
-        key: UPSTASH_STATE_KEY,
-        tickets: state.tickets ? Object.keys(state.tickets).length : 0,
-        loginCodes: state.loginCodes ? Object.keys(state.loginCodes).length : 0,
-        scanEvents: Array.isArray(state.scanEvents) ? state.scanEvents.length : 0,
-      });
-    } catch (e) {
-      console.error(e);
-      return res.status(503).json(storageErrorResponse("read", e, "Upstash"));
-    }
+  if (!getSupabase()) {
+    return res.json({ ok: true, storage: "file", message: "local file storage" });
   }
-  if (!getSupabase()) return res.json({ ok: true, storage: "file", message: "local file storage" });
   try {
     const state = await readStateFromSupabase();
     return res.json({
@@ -1304,7 +1178,7 @@ app.get("/api/storage-health", async (_req, res) => {
     });
   } catch (e) {
     console.error(e);
-    return res.status(503).json(storageErrorResponse("read", e, "Supabase"));
+    return res.status(503).json(storageErrorResponse("read", e));
   }
 });
 
