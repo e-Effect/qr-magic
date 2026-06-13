@@ -745,47 +745,6 @@ function buildUrl(template, query, req) {
     .replaceAll("{query}", encodeURIComponent(query));
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function isLinkPreviewRequest(req) {
-  const ua = String(req.get("user-agent") || "").toLowerCase();
-  return [
-    "facebookexternalhit",
-    "line-poker",
-    "twitterbot",
-    "slackbot-linkexpanding",
-    "discordbot",
-    "telegrambot",
-    "whatsapp",
-    "skypeuripreview",
-    "linkedinbot",
-  ].some((needle) => ua.includes(needle));
-}
-
-function sendNeutralLinkPreview(req, res) {
-  const url = `${req.protocol}://${req.get("host")}${req.originalUrl || req.url || ""}`;
-  res.set("Cache-Control", "no-store, max-age=0");
-  res.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
-  return res.status(200).type("html").send(`<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta property="og:type" content="website">
-<meta property="og:title" content="QR">
-<meta property="og:description" content="">
-<meta property="og:url" content="${escapeHtml(url)}">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="QR">
-<meta name="twitter:description" content="">
-<title>QR</title></head>
-<body></body></html>`);
-}
-
 function googleSearchUrl(query) {
   return `https://www.google.com/search?q=${encodeURIComponent(String(query || "").trim())}`;
 }
@@ -1489,8 +1448,6 @@ app.post("/api/logout", authRequired, async (req, res) => {
 
 /** Spectator scan */
 app.get("/r/:token", async (req, res) => {
-  if (isLinkPreviewRequest(req)) return sendNeutralLinkPreview(req, res);
-
   let state;
   try {
     state = await readState();
