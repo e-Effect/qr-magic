@@ -7,108 +7,128 @@
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="mask-icon" href="/mask-icon.svg" color="#d7b56d" />
   <link rel="manifest" href="/site.webmanifest" />
-  <title>QR Magic（個人用）</title>
+  <title>Private Console</title>
   <style>
     :root {
       color-scheme: dark;
-      font-family: Inter, "SF Pro Display", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
-      color: #f6f0e8;
-      background: #101010;
-      --bg: #101010;
-      --panel: #181817;
-      --panel-2: #20201f;
-      --line: rgba(246, 240, 232, .12);
-      --line-strong: rgba(246, 240, 232, .22);
-      --text: #f6f0e8;
-      --muted: #a9a39a;
-      --soft: #d8d0c5;
+      font-family: Inter, "SF Pro Text", "SF Pro Display", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+      color: #f7f4ee;
+      background: #0f100f;
+      --bg: #0f100f;
+      --surface: #141514;
+      --surface-2: #1b1c1a;
+      --separator: rgba(247, 244, 238, .12);
+      --separator-strong: rgba(247, 244, 238, .2);
+      --text: #f7f4ee;
+      --muted: #a7aaa3;
+      --secondary: #d4d8cf;
       --primary: #d7b56d;
-      --primary-ink: #17120b;
+      --primary-ink: #18130a;
       --accent: #54b7a1;
-      --danger: #db5c53;
-      --shadow: 0 18px 50px rgba(0,0,0,.34);
+      --danger: #e55f57;
+      --nav-h: 4.35rem;
     }
     * { box-sizing: border-box; }
     html { min-height: 100%; background: var(--bg); }
     body {
-      margin: 0 auto;
-      width: min(100%, 560px);
+      margin: 0;
+      width: 100%;
       min-height: 100vh;
-      padding: 1.15rem 1rem 3rem;
-      background:
-        linear-gradient(180deg, rgba(215,181,109,.09), rgba(16,16,16,0) 13rem),
-        var(--bg);
+      padding: var(--nav-h) 0 6rem;
+      background: var(--bg);
     }
-    h1 { font-size: 1.5rem; line-height: 1.05; margin: 0; letter-spacing: 0; }
-    h2 { font-size: 0.78rem; margin: 0 0 0.7rem; color: var(--muted); letter-spacing: 0; font-weight: 700; text-transform: uppercase; }
-    h3 { font-size: 0.9rem; margin: 0; }
+    h1 { font-size: 1.08rem; line-height: 1.15; margin: 0; letter-spacing: 0; font-weight: 750; }
+    h2 { font-size: 0.76rem; margin: 0 0 0.45rem; color: var(--muted); letter-spacing: 0; font-weight: 720; text-transform: uppercase; }
+    h3 { font-size: 0.96rem; margin: 0; font-weight: 720; }
     input[type="text"], input[type="password"], textarea, select {
       width: 100%;
-      padding: 0.78rem 0.85rem;
+      min-height: 2.9rem;
+      padding: 0.62rem 0;
       font-size: 1rem;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #111;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
       color: var(--text);
       outline: none;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
     }
     input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus, input[type="number"]:focus {
-      border-color: rgba(215,181,109,.72);
-      box-shadow: 0 0 0 3px rgba(215,181,109,.13), inset 0 1px 0 rgba(255,255,255,.03);
+      outline: none;
     }
     input[type="number"] {
-      padding: 0.66rem 0.7rem;
+      min-height: 2.65rem;
+      padding: 0.5rem 0;
       font-size: 1rem;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #111;
+      border: 0;
+      border-bottom: 1px solid var(--separator);
+      border-radius: 0;
+      background: transparent;
       color: var(--text);
       outline: none;
     }
-    textarea { min-height: 2.5rem; resize: vertical; }
+    select { appearance: none; }
+    textarea {
+      min-height: 7.4rem;
+      resize: vertical;
+      padding: 0.7rem 0;
+      border-top: 1px solid var(--separator);
+      border-bottom: 1px solid var(--separator);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
     button {
       cursor: pointer;
       border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 0.72rem 1rem;
+      border-radius: 999px;
+      min-height: 2.45rem;
+      padding: 0.56rem 0.9rem;
       font-size: 0.95rem;
-      font-weight: 700;
+      font-weight: 720;
       letter-spacing: 0;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease, opacity .12s ease;
+      transition: border-color .12s ease, background .12s ease, opacity .12s ease;
     }
-    button:hover { transform: translateY(-1px); }
-    button:active { transform: translateY(0); }
     button:disabled { opacity: 0.52; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: var(--primary-ink); border-color: rgba(255,255,255,.08); }
-    .btn-secondary { background: rgba(246,240,232,.08); color: var(--text); border-color: var(--line); }
-    .btn-danger { background: rgba(219,92,83,.18); color: #ffd9d5; border-color: rgba(219,92,83,.34); }
+    .btn-secondary { background: rgba(247,244,238,.08); color: var(--text); border-color: var(--separator); }
+    .btn-danger { background: rgba(229,95,87,.18); color: #ffd7d3; border-color: rgba(229,95,87,.38); }
     .panel {
-      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)), var(--panel);
-      border-radius: 8px;
-      padding: 1rem;
-      border: 1px solid var(--line);
-      margin-top: 0.78rem;
-      box-shadow: 0 1px 0 rgba(255,255,255,.03);
+      background: var(--surface);
+      padding: 1rem max(1rem, env(safe-area-inset-left)) 1.05rem max(1rem, env(safe-area-inset-right));
+      border-top: 1px solid var(--separator);
+      border-bottom: 1px solid var(--separator);
+      margin-top: 0.7rem;
     }
     .muted { color: var(--muted); font-size: 0.85rem; word-break: break-all; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.65rem; align-items: center; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.75rem; align-items: center; }
     .brandHeader {
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 70;
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding: 0.6rem 0 0.7rem;
+      gap: 0.75rem;
+      min-height: var(--nav-h);
+      padding: calc(0.55rem + env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.55rem max(1rem, env(safe-area-inset-left));
+      background: rgba(15,16,15,.92);
+      border-bottom: 1px solid var(--separator);
+      backdrop-filter: blur(18px);
+    }
+    .brandIdentity {
+      display: grid;
+      grid-template-columns: 2.15rem minmax(0, 1fr);
+      grid-template-rows: auto auto;
+      column-gap: 0.7rem;
+      align-items: center;
+      min-width: 0;
     }
     .brandMark {
       display: inline-grid;
       place-items: center;
-      width: 2.6rem;
-      height: 2.6rem;
+      width: 2.15rem;
+      height: 2.15rem;
+      grid-row: 1 / span 2;
       border-radius: 8px;
       background: #101010;
-      margin-bottom: 0.6rem;
-      box-shadow: 0 10px 30px rgba(0,0,0,.42);
       overflow: hidden;
     }
     .brandMark img {
@@ -116,34 +136,36 @@
       height: 100%;
       display: block;
     }
-    .brandKicker { color: var(--primary); font-size: 0.75rem; font-weight: 800; margin: 0 0 0.35rem; letter-spacing: 0; }
+    .brandKicker { color: var(--primary); font-size: 0.66rem; font-weight: 800; margin: 0 0 0.08rem; letter-spacing: 0; }
     .versionPill {
       flex: 0 0 auto;
-      border: 1px solid var(--line);
-      background: rgba(246,240,232,.06);
+      border: 1px solid var(--separator);
+      background: rgba(247,244,238,.06);
       border-radius: 999px;
-      padding: 0.32rem 0.58rem;
-      font-size: 0.72rem;
-      color: var(--soft);
-      margin: 0 0 0.15rem;
+      padding: 0.3rem 0.55rem;
+      font-size: 0.7rem;
+      color: var(--secondary);
+      margin: 0;
+    }
+    .navActions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      flex: 0 0 auto;
     }
     .settingsFab {
-      position: fixed;
-      top: 0.75rem;
-      right: 0.75rem;
-      z-index: 80;
       display: none;
       align-items: center;
       gap: 0.35rem;
-      padding: 0.5rem 0.78rem;
-      font-size: 0.88rem;
-      font-weight: 600;
+      min-height: 2.25rem;
+      padding: 0.46rem 0.72rem;
+      font-size: 0.82rem;
+      font-weight: 760;
       border-radius: 999px;
-      background: rgba(24,24,23,.94);
-      border: 1px solid var(--line-strong);
-      box-shadow: var(--shadow);
+      background: rgba(247,244,238,.09);
+      border: 1px solid var(--separator-strong);
       color: var(--text);
-      backdrop-filter: blur(12px);
     }
     .settingsFab.settingsFab--visible { display: inline-flex; }
     .settingsBackdrop {
@@ -161,11 +183,10 @@
       top: 0;
       right: 0;
       bottom: 0;
-      width: min(100vw, 25rem);
+      width: min(100vw, 27rem);
       z-index: 100;
-      background: #141413;
-      border-left: 1px solid var(--line);
-      box-shadow: -18px 0 60px rgba(0,0,0,.42);
+      background: var(--bg);
+      border-left: 1px solid var(--separator);
       flex-direction: column;
       overflow: hidden;
     }
@@ -175,18 +196,22 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid var(--line);
+      min-height: var(--nav-h);
+      padding: calc(0.55rem + env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.55rem max(1rem, env(safe-area-inset-left));
+      border-bottom: 1px solid var(--separator);
       flex-shrink: 0;
+      background: rgba(15,16,15,.94);
+      backdrop-filter: blur(18px);
     }
     .settingsDrawerHead h2 { font-size: 0.95rem; margin: 0; }
-    .settingsDrawerBody { padding: 0.75rem 0.85rem 1.25rem; overflow: auto; flex: 1; }
+    .settingsDrawerBody { padding: 0.7rem 0 6rem; overflow: auto; flex: 1; }
     .settingsDrawerBody textarea { font-size: 0.72rem; font-family: ui-monospace, monospace; min-height: 9rem; }
-    .settingsSection { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin-bottom: 0.55rem; overflow: hidden; }
+    .settingsSection { border-top: 1px solid var(--separator); border-bottom: 1px solid var(--separator); background: var(--surface); margin-bottom: 0.7rem; overflow: hidden; }
     .settingsSection summary {
       cursor: pointer;
       list-style: none;
-      padding: 0.72rem 0.75rem;
+      min-height: 3.3rem;
+      padding: 0.85rem max(1rem, env(safe-area-inset-right)) 0.85rem max(1rem, env(safe-area-inset-left));
       font-weight: 700;
       display: flex;
       justify-content: space-between;
@@ -194,35 +219,83 @@
       align-items: center;
     }
     .settingsSection summary::-webkit-details-marker { display: none; }
-    .settingsSection summary::after { content: "開く"; color: var(--primary); font-size: 0.76rem; font-weight: 800; white-space: nowrap; }
-    .settingsSection[open] summary { border-bottom: 1px solid var(--line); background: rgba(246,240,232,.035); }
-    .settingsSection[open] summary::after { content: "閉じる"; }
-    .settingsSectionBody { padding: 0.75rem; }
+    .settingsSection summary::after { content: "›"; color: var(--muted); font-size: 1.25rem; font-weight: 500; line-height: 1; white-space: nowrap; }
+    .settingsSection[open] summary { border-bottom: 1px solid var(--separator); background: rgba(247,244,238,.035); }
+    .settingsSection[open] summary::after { content: "⌄"; }
+    .settingsSectionBody { padding: 0.85rem max(1rem, env(safe-area-inset-right)) 1rem max(1rem, env(safe-area-inset-left)); }
     .qrStateList { display: grid; gap: 0.4rem; max-height: 18rem; overflow: auto; margin-top: 0.55rem; }
-    .qrStateRow { border: 1px solid var(--line); border-radius: 8px; padding: 0.55rem; background: #111; }
+    .qrStateRow { border-bottom: 1px solid var(--separator); padding: 0.65rem 0; background: transparent; }
     .qrStateTop { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.18rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: rgba(246,240,232,.09); color: var(--soft); white-space: nowrap; }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 0.18rem 0.5rem; font-size: 0.72rem; font-weight: 800; background: rgba(247,244,238,.09); color: var(--secondary); white-space: nowrap; }
     .badge--fixed { background: rgba(84,183,161,.18); color: #91e6d3; }
     .badge--hit { background: rgba(215,181,109,.18); color: #f2d68e; }
     #app { display: grid; gap: 0; }
-    #keyword { font-size: 1.28rem; font-weight: 800; padding: 0.9rem 0.95rem; }
-    .injectUrlPanel { margin-top: 0.2rem; }
-    .copyRow { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: center; }
-    .copyRow input { font-size: 0.92rem; font-weight: 700; }
-    .copyRow button { padding: 0.72rem 0.82rem; white-space: nowrap; }
+    #keyword { font-size: 1.55rem; font-weight: 780; padding: 0.6rem 0; }
+    .injectUrlPanel { margin-top: 0; background: var(--surface-2); }
+    .copyRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; border-top: 1px solid var(--separator); }
+    .copyRow input { font-size: 0.92rem; font-weight: 720; }
+    .copyRow button { white-space: nowrap; }
     #toast {
-      border: 1px solid var(--line-strong);
-      box-shadow: var(--shadow);
+      border: 1px solid var(--separator-strong);
     }
-    @media (min-width: 720px) {
-      body { padding-top: 1.6rem; }
+    #gate { margin-top: 0; }
+    #gate .toolbar, #app .toolbar { justify-content: flex-start; }
+    #templateSelect {
+      border-top: 1px solid var(--separator);
+      color: var(--text);
+      font-weight: 720;
+    }
+    #modeLine { margin-top: 0.55rem; }
+    .modePanel .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--separator);
+      border-radius: 10px;
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+    #btnModeRecycle, #btnModeFrozen {
+      min-width: 0;
+      border-radius: 0;
+      border: 0;
+      background: transparent;
+      color: var(--secondary);
+    }
+    #btnModeFrozen { border-left: 1px solid var(--separator); }
+    #btnModeRecycle.btn-primary {
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+    #btnModeFrozen.btn-danger {
+      background: rgba(229,95,87,.2);
+      color: #ffd7d3;
+    }
+    @media (max-width: 430px) {
+      .versionPill { display: none; }
+    }
+    @media (min-width: 760px) {
+      body { padding-bottom: 7rem; }
+      .panel {
+        display: grid;
+        grid-template-columns: minmax(11rem, 18rem) minmax(0, 1fr);
+        column-gap: 1.6rem;
+        align-items: start;
+      }
+      .panel h2 {
+        grid-column: 1;
+        padding-top: 0.18rem;
+      }
+      .panel > :not(h2) {
+        grid-column: 2;
+      }
+      #app .panel {
+        margin-top: 0;
+      }
     }
   </style>
 </head>
 <body>
-  <button type="button" class="settingsFab" id="btnOpenSettings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsDrawer">
-    設定
-  </button>
   <div class="settingsBackdrop" id="settingsBackdrop" aria-hidden="true"></div>
   <div class="settingsDrawer" id="settingsDrawer" role="dialog" aria-modal="true" aria-labelledby="settingsDrawerTitle">
     <div class="settingsDrawerHead">
@@ -317,12 +390,17 @@
   </div>
 
   <header class="brandHeader">
-    <div>
+    <div class="brandIdentity">
       <div class="brandMark"><img src="/icon.svg" alt="" aria-hidden="true" /></div>
       <p class="brandKicker">PRIVATE REDIRECT CONSOLE</p>
       <h1>QR Magic</h1>
     </div>
-    <p id="appVersionBar" class="versionPill">バージョン …</p>
+    <div class="navActions">
+      <p id="appVersionBar" class="versionPill">バージョン …</p>
+      <button type="button" class="settingsFab" id="btnOpenSettings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsDrawer">
+        設定
+      </button>
+    </div>
   </header>
 
   <div class="panel injectUrlPanel">
@@ -348,7 +426,7 @@
       <select id="templateSelect" aria-label="テンプレート" style="margin-top:0.35rem"></select>
     </div>
 
-    <div class="panel">
+    <div class="panel modePanel">
       <h2>モード選択</h2>
       <div class="toolbar">
         <button type="button" class="btn-secondary" id="btnModeRecycle">リサイクル</button>
@@ -951,7 +1029,7 @@
       try {
         await load();
         gate.style.display = "none";
-        appEl.style.display = "block";
+        appEl.style.display = "grid";
         setSettingsFabVisible(true);
         renderAll({ clearKeyword: true });
         startPublicUrlPoller();
