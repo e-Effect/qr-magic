@@ -28,6 +28,7 @@ const crypto = require("crypto");
 const express = require("express");
 const QRCode = require("qrcode");
 const JSZip = require("jszip");
+const { Pool } = require("pg");
 
 /** Render 等のエフェメラルディスクでは消える。設定すると名刺URLもデプロイ後も残る */
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
@@ -40,6 +41,29 @@ const QR_MAGIC_STATE_TABLE = "qr_magic_app_state";
 const UPSTASH_REDIS_REST_URL = (process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/\/+$/, "");
 const UPSTASH_REDIS_REST_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
 const UPSTASH_STATE_KEY = (process.env.UPSTASH_STATE_KEY || "qr-magic:app-state").trim() || "qr-magic:app-state";
+const DATABASE_URL = (process.env.DATABASE_URL || "").trim();
+const QR_MAGIC_DB_SCHEMA = "qr_magic";
+
+let postgresPool = null;
+let postgresReadyPromise = null;
+
+function getPostgres() {
+  if (!DATABASE_URL) return null;
+  if (!postgresPool) {
+    const isLocal = /(?:localhost|127\.0\.0\.1)/i.test(DATABASE_URL);
+    postgresPool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: isLocal ? false : { rejectUnauthorized: false },
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+    postgresPool.on("error", (error) => {
+      console.error("[qr-magic] PostgreSQL pool:", storageErrorDetail(error));
+    });
+  }
+  return postgresPool;
+}
 
 let supabaseClient = null;
 function getSupabase() {
@@ -548,6 +572,101 @@ async function readStateFromUpstash() {
   return seeded.state;
 }
 
+async function ensurePostgresStorage() {
+  const pool = getPostgres();
+  if (!pool) {
+    const error = new Error("PostgreSQL is not configured");
+    error.code = "POSTGRES_NOT_CONFIGURED";
+    throw error;
+  }
+  if (!postgresReadyPromise) {
+    postgresReadyPromise = pool
+      .query(`
+        CREATE SCHEMA IF NOT EXISTS ${QR_MAGIC_DB_SCHEMA};
+        CREATE TABLE IF NOT EXISTS ${QR_MAGIC_DB_SCHEMA}.app_state (
+          id SMALLINT PRIMARY KEY CHECK (id = 1),
+          data JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS ${QR_MAGIC_DB_SCHEMA}.app_state_backups (
+          backup_id BIGSERIAL PRIMARY KEY,
+          data JSONB NOT NULL,
+          source TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `)
+      .catch((error) => {
+        postgresReadyPromise = null;
+        throw error;
+      });
+  }
+  await postgresReadyPromise;
+  return pool;
+}
+
+async function readSeedStateForPostgres() {
+  if (getUpstash()) {
+    try {
+      return { source: "upstash", state: await readStateFromUpstash() };
+    } catch (error) {
+      console.error("[qr-magic] Upstash seed for PostgreSQL failed:", storageErrorDetail(error));
+    }
+  }
+  if (getSupabase()) {
+    try {
+      return { source: "supabase", state: await readStateFromSupabase() };
+    } catch (error) {
+      console.error("[qr-magic] Supabase seed for PostgreSQL failed:", storageErrorDetail(error));
+    }
+  }
+  const hadFile = fs.existsSync(STATE_FILE);
+  return { source: hadFile ? "file" : "default", state: readStateFromFileSync() };
+}
+
+async function writeStateToPostgres(state) {
+  const pool = await ensurePostgresStorage();
+  stripLegacyPerformanceFlags(state);
+  await pool.query(
+    `INSERT INTO ${QR_MAGIC_DB_SCHEMA}.app_state (id, data, updated_at)
+     VALUES (1, $1::jsonb, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+    [JSON.stringify(state)]
+  );
+}
+
+async function readStateFromPostgres() {
+  const pool = await ensurePostgresStorage();
+  const result = await pool.query(`SELECT data FROM ${QR_MAGIC_DB_SCHEMA}.app_state WHERE id = 1`);
+  if (result.rows[0] && result.rows[0].data && typeof result.rows[0].data === "object") {
+    return hydrateMergedState(result.rows[0].data);
+  }
+
+  const seeded = await readSeedStateForPostgres();
+  const state = hydrateMergedState(seeded.state);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO ${QR_MAGIC_DB_SCHEMA}.app_state_backups (data, source) VALUES ($1::jsonb, $2)`,
+      [JSON.stringify(state), `initial-seed:${seeded.source}`]
+    );
+    await client.query(
+      `INSERT INTO ${QR_MAGIC_DB_SCHEMA}.app_state (id, data, updated_at)
+       VALUES (1, $1::jsonb, NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify(state)]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  console.log(`[qr-magic] PostgreSQL state initialized from ${seeded.source}.`);
+  return state;
+}
+
 function stripLegacyPerformanceFlags(s) {
   if (!s || typeof s !== "object") return;
   delete s.counter;
@@ -605,6 +724,9 @@ async function writeStateToUpstash(state) {
 }
 
 async function readState() {
+  if (getPostgres()) {
+    return await readStateFromPostgres();
+  }
   if (getUpstash()) {
     try {
       return await readStateFromUpstash();
@@ -624,6 +746,10 @@ async function readState() {
 }
 
 async function writeState(state) {
+  if (getPostgres()) {
+    await writeStateToPostgres(state);
+    return;
+  }
   if (getUpstash()) {
     try {
       await writeStateToUpstash(state);
@@ -669,6 +795,7 @@ function storageErrorDetail(err) {
 }
 
 function primaryStorageName() {
+  if (getPostgres()) return "PostgreSQL";
   if (getUpstash()) return "Upstash";
   if (getSupabase()) return "Supabase";
   return "local file";
@@ -676,9 +803,12 @@ function primaryStorageName() {
 
 function storageErrorResponse(action, err, storageName) {
   const name = storageName || primaryStorageName();
-  const codePrefix = name === "Upstash" ? "UPSTASH" : name === "Supabase" ? "SUPABASE" : "FILE";
+  const codePrefix =
+    name === "PostgreSQL" ? "POSTGRES" : name === "Upstash" ? "UPSTASH" : name === "Supabase" ? "SUPABASE" : "FILE";
   const message =
-    name === "Upstash"
+    name === "PostgreSQL"
+      ? "保存先(PostgreSQL)に接続できません。DATABASE_URL と Render PostgreSQL の状態を確認してください。"
+      : name === "Upstash"
       ? "保存先(Upstash)に接続できません。UPSTASH_REDIS_REST_URL と UPSTASH_REDIS_REST_TOKEN を確認してください。"
       : name === "Supabase"
         ? "保存先(Supabase)に接続できません。SUPABASE_URL と service_role/secret key を確認してください。"
@@ -1318,6 +1448,27 @@ app.get("/api/version", (_req, res) => {
 });
 
 app.get("/api/storage-health", async (_req, res) => {
+  if (getPostgres()) {
+    try {
+      const state = await readStateFromPostgres();
+      const pool = await ensurePostgresStorage();
+      const meta = await pool.query(
+        `SELECT updated_at FROM ${QR_MAGIC_DB_SCHEMA}.app_state WHERE id = 1`
+      );
+      return res.json({
+        ok: true,
+        storage: "postgres",
+        schema: QR_MAGIC_DB_SCHEMA,
+        updatedAt: meta.rows[0] ? meta.rows[0].updated_at : null,
+        tickets: state.tickets ? Object.keys(state.tickets).length : 0,
+        loginCodes: state.loginCodes ? Object.keys(state.loginCodes).length : 0,
+        scanEvents: Array.isArray(state.scanEvents) ? state.scanEvents.length : 0,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(503).json(storageErrorResponse("read", error, "PostgreSQL"));
+    }
+  }
   if (getUpstash()) {
     try {
       const state = await readStateFromUpstash();
@@ -2052,11 +2203,15 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`QR magic listening on http://localhost:${PORT}`);
   console.log(`Login: open http://localhost:${PORT}/  (8桁ID / 管理者ID=${ADMIN_ID})`);
-  if (getSupabase()) {
+  if (getPostgres()) {
+    console.log(`状態の保存先: PostgreSQL スキーマ ${QR_MAGIC_DB_SCHEMA}（デプロイ後も維持）`);
+  } else if (getUpstash()) {
+    console.log(`状態の保存先: Upstash キー ${UPSTASH_STATE_KEY}（デプロイ後も維持）`);
+  } else if (getSupabase()) {
     console.log(`状態の保存先: Supabase テーブル ${QR_MAGIC_STATE_TABLE}（デプロイ後も維持）`);
   } else {
     console.log(`状態の保存先: ローカルファイル ${STATE_FILE}（Render 無料ディスクは非永続のため URL は消えます）`);
-    console.log(`永続化するには: .env.example の SUPABASE_* を参照`);
+    console.log(`永続化するには: .env.example の DATABASE_URL を参照`);
   }
   const localPublic = `http://localhost:${PORT}/r/${PUBLIC_TOKEN}`;
   console.log(`Public QR path (local): ${localPublic}`);
