@@ -1507,7 +1507,7 @@ app.get("/api/public-qr-hint", (req, res) => {
   res.json({ ok: true, publicBaseUrl: base || null });
 });
 
-app.get(["/g", "/search-wait"], (_req, res) => {
+app.get(["/", "/g", "/search-wait"], (_req, res) => {
   res.type("html").send(renderGoogleWaitPage());
 });
 
@@ -2178,7 +2178,7 @@ function loadAdminIndexHtml() {
   return null;
 }
 
-app.get("/", (_req, res) => {
+app.get(["/app", "/admin"], (_req, res) => {
   const html = loadAdminIndexHtml();
   if (html) {
     res.set("Cache-Control", "no-store");
@@ -2202,7 +2202,7 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`QR magic listening on http://localhost:${PORT}`);
-  console.log(`Login: open http://localhost:${PORT}/  (8桁ID / 管理者ID=${ADMIN_ID})`);
+  console.log(`Login: open http://localhost:${PORT}/app  (8桁ID / 管理者ID=${ADMIN_ID})`);
   if (getPostgres()) {
     console.log(`状態の保存先: PostgreSQL スキーマ ${QR_MAGIC_DB_SCHEMA}（デプロイ後も維持）`);
   } else if (getUpstash()) {

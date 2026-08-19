@@ -406,7 +406,7 @@
   <div class="panel injectUrlPanel">
     <h2>インジェクトモードURL</h2>
     <div class="copyRow">
-      <input type="text" id="injectModeUrl" readonly value="https://qr-magic-tk7m.onrender.com/g" aria-label="インジェクトモードURL" />
+      <input type="text" id="injectModeUrl" readonly value="https://search.a-line.workers.dev" aria-label="インジェクトモードURL" />
       <button type="button" class="btn-secondary" id="btnCopyInjectUrl">コピー</button>
     </div>
   </div>
@@ -487,7 +487,7 @@
     }
 
     function injectModeUrl() {
-      return audienceOrigin() + "/g";
+      return audienceOrigin();
     }
 
     function renderInjectModeUrl() {

@@ -1,7 +1,7 @@
 {
   "name": "Private Console",
   "short_name": "Console",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#101010",
   "theme_color": "#101010",
