@@ -238,6 +238,25 @@
     #toast {
       border: 1px solid var(--separator-strong);
     }
+    .audienceNotice {
+      display: none;
+      position: fixed;
+      top: calc(var(--nav-h) + env(safe-area-inset-top));
+      left: 0;
+      right: 0;
+      z-index: 85;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem max(1rem, env(safe-area-inset-right)) 0.9rem max(1rem, env(safe-area-inset-left));
+      background: #d7b56d;
+      color: #18130a;
+      border-bottom: 1px solid rgba(0,0,0,.22);
+    }
+    .audienceNotice--visible { display: grid; }
+    .audienceNoticeLabel { display: block; font-size: 0.72rem; font-weight: 760; }
+    .audienceNoticeQuery { display: block; margin-top: 0.15rem; font-size: 1.3rem; line-height: 1.25; overflow-wrap: anywhere; }
+    .audienceNotice button { width: 2.5rem; min-height: 2.5rem; padding: 0; border-radius: 50%; background: rgba(0,0,0,.12); color: #18130a; font-size: 1.3rem; }
     #gate { margin-top: 0; }
     #gate .toolbar, #app .toolbar { justify-content: flex-start; }
     #templateSelect {
@@ -329,6 +348,19 @@
         </div>
       </details>
 
+      <details class="settingsSection" id="settingsAudienceSearchSection">
+        <summary>観客検索</summary>
+        <div class="settingsSectionBody">
+          <p class="muted" style="margin-top:0">観客が検索語の送信に同意すると、この管理画面へ通知されてからGoogle検索へ移動します。</p>
+          <label class="muted" for="audienceSearchUrl">観客用URL</label>
+          <div class="copyRow">
+            <input type="text" id="audienceSearchUrl" readonly value="準備中" aria-label="観客検索URL" />
+            <button type="button" class="btn-secondary" id="btnCopyAudienceSearchUrl">コピー</button>
+          </div>
+          <p id="audienceSearchLatest" class="muted" style="margin:.85rem 0 0">最新の検索: まだありません</p>
+        </div>
+      </details>
+
       <details class="settingsSection" id="settingsQrStateSection">
         <summary>QRごとの状態</summary>
         <div class="settingsSectionBody">
@@ -403,6 +435,14 @@
     </div>
   </header>
 
+  <div class="audienceNotice" id="audienceSearchNotice" role="alert" aria-live="assertive">
+    <div>
+      <span class="audienceNoticeLabel">観客が検索しました</span>
+      <strong class="audienceNoticeQuery" id="audienceSearchNoticeQuery"></strong>
+    </div>
+    <button type="button" id="btnCloseAudienceSearchNotice" aria-label="通知を閉じる" title="閉じる">×</button>
+  </div>
+
   <div class="panel injectUrlPanel">
     <h2>インジェクトモードURL</h2>
     <div class="copyRow">
@@ -457,6 +497,9 @@
     let state = null;
     let publicBaseUrl = "";
     let qrStateRows = [];
+    let audienceSearchChannel = null;
+    let audienceSearchLastEventId = "";
+    let audienceSearchPollTimer = null;
 
     function toast(msg) {
       const t = document.getElementById("toast");
@@ -504,6 +547,61 @@
         input.select();
         document.execCommand("copy");
       }
+    }
+
+    function renderAudienceSearchLatest(event) {
+      const element = document.getElementById("audienceSearchLatest");
+      if (!element) return;
+      element.textContent = event && event.query
+        ? "最新の検索: " + event.query
+        : "最新の検索: まだありません";
+    }
+
+    function showAudienceSearchNotice(event) {
+      if (!event || !event.query) return;
+      renderAudienceSearchLatest(event);
+      document.getElementById("audienceSearchNoticeQuery").textContent = event.query;
+      document.getElementById("audienceSearchNotice").classList.add("audienceNotice--visible");
+      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+    }
+
+    async function prepareAudienceSearchChannel() {
+      try {
+        const data = await api("/api/audience-search/channel", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        audienceSearchChannel = data;
+        const input = document.getElementById("audienceSearchUrl");
+        if (input) input.value = data.url || "";
+        if (!audienceSearchLastEventId && data.latest) audienceSearchLastEventId = data.latest.id || "";
+        renderAudienceSearchLatest(data.latest || null);
+        return true;
+      } catch (error) {
+        const input = document.getElementById("audienceSearchUrl");
+        if (input) input.value = "取得できませんでした";
+        return false;
+      }
+    }
+
+    function scheduleAudienceSearchPoll(delay) {
+      if (audienceSearchPollTimer) clearTimeout(audienceSearchPollTimer);
+      audienceSearchPollTimer = setTimeout(async () => {
+        try {
+          const data = await api("/api/audience-search/latest");
+          const latest = data.latest || null;
+          if (latest && latest.id && latest.id !== audienceSearchLastEventId) {
+            audienceSearchLastEventId = latest.id;
+            showAudienceSearchNotice(latest);
+          }
+        } catch (_) {}
+        scheduleAudienceSearchPoll(document.hidden ? 5000 : 1200);
+      }, delay);
+    }
+
+    async function startAudienceSearchPoller() {
+      const ready = audienceSearchChannel || (await prepareAudienceSearchChannel());
+      if (ready) scheduleAudienceSearchPoll(1200);
     }
 
     function setSettingsFabVisible(on) {
@@ -903,6 +1001,18 @@
     document.getElementById("settingsBackdrop").onclick = () => closeSettingsDrawer();
     document.getElementById("btnRefreshUrlList").onclick = () => loadActiveTicketUrlsIntoDrawer();
     document.getElementById("btnRefreshHistory").onclick = () => loadTicketHistoryIntoDrawer();
+    document.getElementById("btnCopyAudienceSearchUrl").onclick = async () => {
+      try {
+        if (!audienceSearchChannel) await prepareAudienceSearchChannel();
+        await copyTextFromInput(document.getElementById("audienceSearchUrl"));
+        toast("コピーしました");
+      } catch (_) {
+        toast("コピーできませんでした");
+      }
+    };
+    document.getElementById("btnCloseAudienceSearchNotice").onclick = () => {
+      document.getElementById("audienceSearchNotice").classList.remove("audienceNotice--visible");
+    };
     document.getElementById("btnDownloadQrZip").onclick = () => downloadTicketQrsZip();
     document.getElementById("btnAdminIssueCodes").onclick = () => issueCodesBulk();
     document.getElementById("btnAdminRefreshCodes").onclick = () => loadAdminCodesIntoDrawer();
@@ -915,6 +1025,9 @@
     });
     document.getElementById("settingsHistorySection").addEventListener("toggle", (e) => {
       if (e.target.open) loadTicketHistoryIntoDrawer();
+    });
+    document.getElementById("settingsAudienceSearchSection").addEventListener("toggle", (e) => {
+      if (e.target.open) prepareAudienceSearchChannel();
     });
     document.getElementById("settingsQrStateSection").addEventListener("toggle", (e) => {
       if (e.target.open) refreshQrState();
@@ -1033,6 +1146,8 @@
         setSettingsFabVisible(true);
         renderAll({ clearKeyword: true });
         startPublicUrlPoller();
+        await prepareAudienceSearchChannel();
+        startAudienceSearchPoller();
       } catch (e) {
         localStorage.removeItem(LS);
         sessionToken = "";

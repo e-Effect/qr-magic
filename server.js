@@ -172,11 +172,16 @@ function defaultState() {
     },
     /** セッション（token -> {id,role,createdAt}） */
     sessions: {},
+    /** 観客検索: ログインIDごとの短い公開コード */
+    audienceSearchChannels: {},
+    /** 観客検索履歴（最新が後ろ） */
+    audienceSearchEvents: [],
   };
 }
 
 const MAX_TEMPLATE_PRESETS = 20;
 const MAX_SCAN_EVENTS = 1000;
+const MAX_AUDIENCE_SEARCH_EVENTS = 200;
 const MAX_UNDO_STACK = 10;
 
 function syncTemplatesFromPresets(state) {
@@ -382,6 +387,85 @@ function normalizeSessionsOnRead(merged) {
   merged.sessions = out;
 }
 
+function normalizeAudienceSearchOnRead(merged) {
+  const rawChannels =
+    merged.audienceSearchChannels && typeof merged.audienceSearchChannels === "object"
+      ? merged.audienceSearchChannels
+      : {};
+  const channels = {};
+  const usedCodes = new Set();
+  for (const ownerId of Object.keys(rawChannels)) {
+    if (!/^\d{8}$/.test(ownerId)) continue;
+    const value = rawChannels[ownerId] && typeof rawChannels[ownerId] === "object" ? rawChannels[ownerId] : {};
+    const code = String(value.code || "").trim().toLowerCase();
+    if (!/^[a-z2-9]{4,12}$/.test(code) || usedCodes.has(code)) continue;
+    usedCodes.add(code);
+    channels[ownerId] = {
+      code,
+      createdAt: typeof value.createdAt === "string" && value.createdAt ? value.createdAt : null,
+    };
+  }
+  merged.audienceSearchChannels = channels;
+
+  const rawEvents = Array.isArray(merged.audienceSearchEvents) ? merged.audienceSearchEvents : [];
+  merged.audienceSearchEvents = rawEvents
+    .filter((event) => event && typeof event === "object")
+    .map((event) => ({
+      id: typeof event.id === "string" ? event.id : "",
+      at: typeof event.at === "string" ? event.at : null,
+      query: typeof event.query === "string" ? event.query.trim().slice(0, 100) : "",
+      ownerId: /^\d{8}$/.test(String(event.ownerId || "")) ? String(event.ownerId) : "",
+    }))
+    .filter((event) => event.id && event.at && event.query && event.ownerId)
+    .slice(-MAX_AUDIENCE_SEARCH_EVENTS);
+}
+
+function generateAudienceSearchCode(state) {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+  const used = new Set(
+    Object.values(state.audienceSearchChannels || {}).map((channel) => String((channel && channel.code) || ""))
+  );
+  for (let attempt = 0; attempt < 200; attempt++) {
+    let code = "";
+    for (let i = 0; i < 4; i++) code += alphabet[crypto.randomInt(alphabet.length)];
+    if (!used.has(code)) return code;
+  }
+  throw new Error("Audience search code generation failed");
+}
+
+function ensureAudienceSearchChannel(state, ownerId) {
+  if (!state.audienceSearchChannels || typeof state.audienceSearchChannels !== "object") {
+    state.audienceSearchChannels = {};
+  }
+  const current = state.audienceSearchChannels[ownerId];
+  if (current && /^[a-z2-9]{4,12}$/.test(String(current.code || ""))) return current;
+  const channel = { code: generateAudienceSearchCode(state), createdAt: new Date().toISOString() };
+  state.audienceSearchChannels[ownerId] = channel;
+  return channel;
+}
+
+function findAudienceSearchOwner(state, code) {
+  const normalized = String(code || "").trim().toLowerCase();
+  for (const [ownerId, channel] of Object.entries(state.audienceSearchChannels || {})) {
+    if (channel && String(channel.code || "").toLowerCase() === normalized) return ownerId;
+  }
+  return "";
+}
+
+function latestAudienceSearchEvent(state, ownerId) {
+  const events = Array.isArray(state.audienceSearchEvents) ? state.audienceSearchEvents : [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (String(events[i].ownerId || "") === ownerId) return events[i];
+  }
+  return null;
+}
+
+function appendAudienceSearchEvent(state, event) {
+  if (!Array.isArray(state.audienceSearchEvents)) state.audienceSearchEvents = [];
+  state.audienceSearchEvents.push(event);
+  state.audienceSearchEvents = state.audienceSearchEvents.slice(-MAX_AUDIENCE_SEARCH_EVENTS);
+}
+
 function normalizeTicketOwnersOnRead(merged) {
   const tickets = merged.tickets && typeof merged.tickets === "object" ? merged.tickets : {};
   for (const tok of Object.keys(tickets)) {
@@ -452,6 +536,7 @@ function hydrateMergedState(parsed) {
   normalizeScanEventsOnRead(merged);
   normalizeLoginCodesOnRead(merged);
   normalizeSessionsOnRead(merged);
+  normalizeAudienceSearchOnRead(merged);
   migrateTemplatePresets(merged);
   normalizeTicketKeywordMode(merged);
   normalizeUndoStackOnRead(merged);
@@ -1259,6 +1344,83 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 </html>`;
 }
 
+function renderAudienceSearchPage(code) {
+  const safeCode = JSON.stringify(String(code || ""));
+  return `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>検索</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#fff;color:#171717}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif;padding:env(safe-area-inset-top) 1.25rem env(safe-area-inset-bottom)}
+main{width:min(100%,38rem);margin:0 auto;padding:18vh 0 2rem}
+h1{font-size:1.55rem;line-height:1.25;margin:0 0 2rem;font-weight:700}
+.search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;border-bottom:1px solid #bbb;padding-bottom:.55rem}
+input[type="search"]{min-width:0;border:0;outline:0;font:inherit;font-size:1.12rem;padding:.55rem .15rem;background:#fff;color:#111}
+button{border:0;border-radius:7px;background:#1769e0;color:#fff;font:inherit;font-weight:700;padding:.65rem 1rem;min-height:2.75rem}
+button:disabled{background:#aeb7c4}
+.consent{display:flex;align-items:flex-start;gap:.65rem;margin-top:1.25rem;color:#4b4b4b;font-size:.88rem;line-height:1.55}
+.consent input{width:1.15rem;height:1.15rem;margin:.18rem 0 0;flex:0 0 auto}
+#status{min-height:1.4rem;margin:1rem 0 0;color:#555;font-size:.9rem}
+@media(max-width:420px){main{padding-top:13vh}.search{grid-template-columns:1fr}button{width:100%}}
+</style>
+</head>
+<body>
+<main>
+  <h1>調べたい言葉を入力</h1>
+  <form id="searchForm">
+    <div class="search">
+      <input id="query" type="search" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="検索する言葉" required autofocus>
+      <button id="submitButton" type="submit" disabled>検索</button>
+    </div>
+    <label class="consent">
+      <input id="consent" type="checkbox">
+      <span>入力した検索語が、この演出の担当者へ送信されることに同意します。</span>
+    </label>
+    <p id="status" role="status" aria-live="polite"></p>
+  </form>
+</main>
+<script>
+(function(){
+  var code = ${safeCode};
+  var form = document.getElementById("searchForm");
+  var query = document.getElementById("query");
+  var consent = document.getElementById("consent");
+  var button = document.getElementById("submitButton");
+  var status = document.getElementById("status");
+  function refresh(){ button.disabled = !consent.checked || !query.value.trim(); }
+  consent.addEventListener("change", refresh);
+  query.addEventListener("input", refresh);
+  form.addEventListener("submit", async function(event){
+    event.preventDefault();
+    var value = query.value.trim();
+    if (!value || !consent.checked) return;
+    button.disabled = true;
+    status.textContent = "検索しています…";
+    try {
+      var response = await fetch("/api/public-audience-search/" + encodeURIComponent(code), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: value, consent: true })
+      });
+      var data = await response.json();
+      if (!response.ok || !data.redirectUrl) throw new Error(data.message || "検索できませんでした");
+      location.assign(data.redirectUrl);
+    } catch (error) {
+      status.textContent = String(error.message || error);
+      refresh();
+    }
+  });
+})();
+</script>
+</body>
+</html>`;
+}
+
 function renderGoogleWaitPage() {
   return `<!doctype html>
 <html lang="ja">
@@ -1442,6 +1604,7 @@ function findTicketEntry(state, rawToken) {
 const app = express();
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "512kb" }));
+const audienceSearchRateLimit = new Map();
 
 app.get("/api/version", (_req, res) => {
   res.json({ ok: true, version: getAppVersion() });
@@ -1505,6 +1668,107 @@ app.get("/api/storage-health", async (_req, res) => {
 app.get("/api/public-qr-hint", (req, res) => {
   const base = getPublicBaseUrl();
   res.json({ ok: true, publicBaseUrl: base || null });
+});
+
+app.get("/q/:code", async (req, res) => {
+  let state;
+  try {
+    state = await readState();
+  } catch (error) {
+    console.error(error);
+    return res.status(503).type("text/plain").send("Service unavailable");
+  }
+  const code = String(req.params.code || "").trim().toLowerCase();
+  const ownerId = findAudienceSearchOwner(state, code);
+  const loginCode = ownerId && state.loginCodes ? state.loginCodes[ownerId] : null;
+  if (!ownerId || !loginCode || loginCode.active === false) {
+    return res.status(404).type("text/plain").send("Not found");
+  }
+  res.set("Cache-Control", "no-store");
+  return res.type("html").send(renderAudienceSearchPage(code));
+});
+
+app.post("/api/public-audience-search/:code", async (req, res) => {
+  const code = String(req.params.code || "").trim().toLowerCase();
+  const query = String((req.body && req.body.query) || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 100);
+  if (!req.body || req.body.consent !== true) {
+    return res.status(400).json({ ok: false, message: "同意が必要です" });
+  }
+  if (!query) return res.status(400).json({ ok: false, message: "検索語を入力してください" });
+
+  const rateKey = `${req.ip || "unknown"}:${code}`;
+  const nowMs = Date.now();
+  const previousMs = audienceSearchRateLimit.get(rateKey) || 0;
+  if (nowMs - previousMs < 1500) {
+    return res.status(429).json({ ok: false, message: "少し待ってから検索してください" });
+  }
+  audienceSearchRateLimit.set(rateKey, nowMs);
+  if (audienceSearchRateLimit.size > 1000) {
+    for (const [key, at] of audienceSearchRateLimit) {
+      if (nowMs - at > 60000) audienceSearchRateLimit.delete(key);
+    }
+  }
+
+  let state;
+  try {
+    state = await readState();
+  } catch (error) {
+    console.error(error);
+    return res.status(503).json(storageErrorResponse("read", error));
+  }
+  const ownerId = findAudienceSearchOwner(state, code);
+  const loginCode = ownerId && state.loginCodes ? state.loginCodes[ownerId] : null;
+  if (!ownerId || !loginCode || loginCode.active === false) {
+    return res.status(404).json({ ok: false, message: "この検索URLは無効です" });
+  }
+
+  appendAudienceSearchEvent(state, {
+    id: crypto.randomBytes(8).toString("hex"),
+    at: new Date().toISOString(),
+    query,
+    ownerId,
+  });
+  try {
+    await writeState(state);
+  } catch (error) {
+    console.error(error);
+    return res.status(503).json(storageErrorResponse("write", error));
+  }
+  return res.json({
+    ok: true,
+    redirectUrl: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+  });
+});
+
+app.post("/api/audience-search/channel", authRequired, async (req, res) => {
+  const state = req.authState || (await readState());
+  const existing = state.audienceSearchChannels && state.audienceSearchChannels[req.auth.id];
+  const channel = ensureAudienceSearchChannel(state, req.auth.id);
+  if (!existing) {
+    try {
+      await writeState(state);
+    } catch (error) {
+      console.error(error);
+      return res.status(503).json(storageErrorResponse("write", error));
+    }
+  }
+  const base = (getPublicBaseUrl() || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
+  const latest = latestAudienceSearchEvent(state, req.auth.id);
+  return res.json({
+    ok: true,
+    path: `/q/${channel.code}`,
+    url: `${base}/q/${channel.code}`,
+    latest: latest ? { id: latest.id, at: latest.at, query: latest.query } : null,
+  });
+});
+
+app.get("/api/audience-search/latest", authRequired, async (req, res) => {
+  const state = req.authState || (await readState());
+  const latest = latestAudienceSearchEvent(state, req.auth.id);
+  return res.json({
+    ok: true,
+    latest: latest ? { id: latest.id, at: latest.at, query: latest.query } : null,
+  });
 });
 
 app.get(["/", "/g", "/search-wait"], (_req, res) => {
