@@ -446,7 +446,7 @@
   <div class="panel injectUrlPanel">
     <h2>インジェクトモードURL</h2>
     <div class="copyRow">
-      <input type="text" id="injectModeUrl" readonly value="https://search.a-line.workers.dev" aria-label="インジェクトモードURL" />
+      <input type="text" id="injectModeUrl" readonly value="https://search.a-line.workers.dev/g" aria-label="インジェクトモードURL" />
       <button type="button" class="btn-secondary" id="btnCopyInjectUrl">コピー</button>
     </div>
   </div>
@@ -530,7 +530,7 @@
     }
 
     function injectModeUrl() {
-      return audienceOrigin();
+      return audienceOrigin() + "/g";
     }
 
     function renderInjectModeUrl() {

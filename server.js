@@ -1771,7 +1771,7 @@ app.get("/api/audience-search/latest", authRequired, async (req, res) => {
   });
 });
 
-app.get(["/", "/g", "/search-wait"], (_req, res) => {
+app.get(["/g", "/search-wait"], (_req, res) => {
   res.type("html").send(renderGoogleWaitPage());
 });
 
@@ -2442,7 +2442,7 @@ function loadAdminIndexHtml() {
   return null;
 }
 
-app.get(["/app", "/admin"], (_req, res) => {
+app.get(["/", "/app", "/admin"], (_req, res) => {
   const html = loadAdminIndexHtml();
   if (html) {
     res.set("Cache-Control", "no-store");
